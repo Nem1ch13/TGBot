@@ -1,5 +1,6 @@
 using Newtonsoft.Json.Linq;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -27,9 +28,40 @@ class Program
     static string currentCityRu = "Альметьевск";
     static bool waitingForCity = false;
 
+    // Словарь с твоими ссылками
+    static Dictionary<string, CityImages> cityImages = new Dictionary<string, CityImages>
+    {
+        ["Almetyevsk"] = new CityImages
+        {
+            Day    = "https://ic.pics.livejournal.com/zdorovs/16627846/1742999/1742999_original.jpg",
+            Evening = "https://ic.pics.livejournal.com/zdorovs/16627846/1749257/1749257_original.jpg",
+            Night  = "https://photocentra.ru/images/main28/285795_main.jpg"
+        },
+        ["Shymkent"] = new CityImages
+        {
+            Day    = "https://img51994.poehali.tv/img/2024-04-22/fmt_114_24_dji_0032.jpg",
+            Evening = "https://informburo.kz/storage/photos/oldArticle/main/SRhiOULsnSUvifkd.jpg",
+            Night  = "https://i.ytimg.com/vi/F1PKeSICD-c/maxresdefault.jpg"
+        },
+        // Для любого другого города – заглушки
+        ["default"] = new CityImages
+        {
+            Day    = "https://i.ibb.co/0jQp5vL/default-day.jpg",
+            Evening = "https://i.ibb.co/v4p9v0w/default-evening.jpg",
+            Night  = "https://i.ibb.co/WDfT9YK/default-night.jpg"
+        }
+    };
+
+    class CityImages
+    {
+        public string? Day { get; set; }
+        public string? Evening { get; set; }
+        public string? Night { get; set; }
+    }
+
     static async Task Main()
     {
-        // ===== Веб-сервер для Railway =====
+        // Веб-сервер для Railway
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
@@ -47,7 +79,7 @@ class Program
 
         _ = host.RunAsync();
 
-        // ===== Бот =====
+        // Бот
         bot = new TelegramBotClient(TG_TOKEN);
         var cts = new CancellationTokenSource();
         bot.StartReceiving(
@@ -136,8 +168,9 @@ class Program
 
     static async Task SendMainMenu(long chatId, CancellationToken ct)
     {
-        var (weatherText, iconUrl) = await GetWeather();
+        var (weatherText, _) = await GetWeather();
         var timeString = GetTime();
+        var timeOfDay = GetTimeOfDay(); // теперь по местному времени
 
         var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
                       $"{timeString}\n" +
@@ -150,15 +183,29 @@ class Program
             new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
         });
 
-        if (!string.IsNullOrEmpty(iconUrl))
+        string? imageUrl = GetCityImageUrl(currentCity, timeOfDay);
+        if (!string.IsNullOrEmpty(imageUrl))
         {
-            await bot.SendPhoto(
-                chatId: chatId,
-                photo: InputFile.FromUri(iconUrl),
-                caption: caption,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
-                cancellationToken: ct);
+            try
+            {
+                await bot.SendPhoto(
+                    chatId: chatId,
+                    photo: InputFile.FromUri(imageUrl),
+                    caption: caption,
+                    parseMode: ParseMode.Markdown,
+                    replyMarkup: keyboard,
+                    cancellationToken: ct);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка отправки фото: {ex.Message}. Отправляем текст.");
+                await bot.SendMessage(
+                    chatId: chatId,
+                    text: caption,
+                    parseMode: ParseMode.Markdown,
+                    replyMarkup: keyboard,
+                    cancellationToken: ct);
+            }
         }
         else
         {
@@ -184,6 +231,80 @@ class Program
         await bot.SendMessage(chatId, "🌍 Выбери город:", replyMarkup: keyboard, cancellationToken: ct);
     }
 
+    // ====== Вспомогательные методы для времени ======
+    /// <summary>
+    /// Возвращает DateTime в локальном времени выбранного города.
+    /// </summary>
+    static DateTime GetLocalDateTime()
+    {
+        string tzId;
+        if (currentCity == "Shymkent")
+            tzId = "West Asia Standard Time"; // UTC+5
+        else
+            tzId = "Russian Standard Time";    // UTC+3
+
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
+            return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+        }
+        catch
+        {
+            // fallback: предполагаем UTC+3 для Альметьевска и UTC+5 для Шымкента
+            int offset = currentCity == "Shymkent" ? 5 : 3;
+            return DateTime.UtcNow.AddHours(offset);
+        }
+    }
+
+    /// <summary>
+    /// Возвращает строку с текущим временем в городе (как раньше).
+    /// </summary>
+    static string GetTime()
+    {
+        var localTime = GetLocalDateTime();
+        return $"🕐 Время в {currentCityRu}:\n{localTime:HH:mm:ss}\n📅 {localTime:dd.MM.yyyy}";
+    }
+
+    /// <summary>
+    /// Определяет время суток по местному времени: "day", "evening" или "night".
+    /// </summary>
+    static string GetTimeOfDay()
+    {
+        var hour = GetLocalDateTime().Hour;
+        if (hour >= 5 && hour < 12) return "day";
+        if (hour >= 12 && hour < 18) return "evening"; // 12:00–17:59 считаем вечером/утром
+        return "night";                                   // 18:00–4:59
+    }
+
+    static string? GetCityImageUrl(string city, string timeOfDay)
+    {
+        if (cityImages.ContainsKey(city))
+        {
+            var images = cityImages[city];
+            return timeOfDay switch
+            {
+                "day" => images.Day,
+                "evening" => images.Evening,
+                "night" => images.Night,
+                _ => null
+            };
+        }
+        // fallback на default
+        if (cityImages.ContainsKey("default"))
+        {
+            var defaultImages = cityImages["default"];
+            return timeOfDay switch
+            {
+                "day" => defaultImages.Day,
+                "evening" => defaultImages.Evening,
+                "night" => defaultImages.Night,
+                _ => null
+            };
+        }
+        return null;
+    }
+
+    // ====== Погода ======
     static async Task<(string text, string? iconUrl)> GetWeather()
     {
         try
@@ -218,27 +339,7 @@ class Program
         }
     }
 
-    static string GetTime()
-    {
-        string tzId;
-        if (currentCity == "Shymkent")
-            tzId = "West Asia Standard Time"; // UTC+5
-        else
-            tzId = "Russian Standard Time"; // UTC+3
-
-        try
-        {
-            var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
-            var time = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
-            return $"🕐 Время в {currentCityRu}:\n{time:HH:mm:ss}\n📅 {time:dd.MM.yyyy}";
-        }
-        catch
-        {
-            var time = DateTime.UtcNow.AddHours(3);
-            return $"🕐 Время в {currentCityRu}:\n{time:HH:mm:ss}\n📅 {time:dd.MM.yyyy}";
-        }
-    }
-
+    // ====== Новости ======
     static async Task<string> GetNews()
     {
         try
