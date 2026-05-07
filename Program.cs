@@ -271,8 +271,8 @@ class Program
     static string GetTimeOfDay()
     {
         var hour = GetLocalDateTime().Hour;
-        if (hour >= 5 && hour < 12) return "day";
-        if (hour >= 12 && hour < 18) return "evening"; // 12:00–17:59 считаем вечером/утром
+        if (hour >= 5 && hour < 12) return "evening";
+        if (hour >= 12 && hour < 18) return "day"; // 12:00–17:59 считаем вечером/утром
         return "night";                                   // 18:00–4:59
     }
 
