@@ -13,8 +13,8 @@ using Telegram.Bot.Types.ReplyMarkups;
 
 class Program
 {
-    static string TG_TOKEN = "8725287167:AAEMwN-nnnOSmQH77gQGzwVaWofAcWdnx9k";
-    static string WEATHER_KEY = "b87ebb55d538c2d9213edfad793e6bef";
+    static string TG_TOKEN = Environment.GetEnvironmentVariable("TG_TOKEN");
+    static string WEATHER_KEY = Environment.GetEnvironmentVariable("WEATHER_KEY");
 
     static TelegramBotClient bot;
     static HttpClient http = new HttpClient();
