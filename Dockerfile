@@ -1,6 +1,6 @@
-FROM mcr.microsoft.com/dotnet/sdk:8.0
+FROM mono:latest
 WORKDIR /app
 COPY . .
-RUN dotnet restore
-RUN dotnet build -c Release
-CMD ["dotnet", "run", "--project", "TGbot.csproj", "-c", "Release"]
+RUN nuget restore TGbot.sln
+RUN msbuild TGbot.sln /p:Configuration=Release
+CMD ["mono", "./bin/Release/TGbot.exe"]
