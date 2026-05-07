@@ -10,15 +10,9 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.AspNetCore.Http;
 
 class Program
 {
-    // Токены теперь берутся из переменных окружения Railway
     static string TG_TOKEN = Environment.GetEnvironmentVariable("TG_TOKEN");
     static string WEATHER_KEY = Environment.GetEnvironmentVariable("WEATHER_KEY");
 
@@ -31,26 +25,8 @@ class Program
 
     static async Task Main()
     {
-        // ===== Встроенный веб-сервер для healthcheck Railway =====
-        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-        var host = Host.CreateDefaultBuilder()
-            .ConfigureWebHostDefaults(webBuilder =>
-            {
-                webBuilder.UseUrls($"http://*:{port}");
-                webBuilder.Configure(app =>
-                {
-                    app.Run(async context =>
-                    {
-                        await context.Response.WriteAsync("Bot is running");
-                    });
-                });
-            })
-            .Build();
-
-        _ = host.RunAsync();
-
-        // ===== Запуск телеграм-бота =====
         bot = new TelegramBotClient(TG_TOKEN);
+
         var cts = new CancellationTokenSource();
         bot.StartReceiving(
             HandleUpdate,
@@ -61,20 +37,15 @@ class Program
 
         var me = await bot.GetMe();
         Console.WriteLine($"Бот @{me.Username} запущен!");
-
-        // Держим приложение живым бесконечно
-        await Task.Delay(Timeout.Infinite);
+        Console.ReadLine();
+        cts.Cancel();
     }
 
-    // ===== Обработка входящих сообщений и колбэков =====
-    static async Task HandleUpdate(ITelegramBotClient botClient, Update update, CancellationToken ct)
+    static async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
-        // Отладочный вывод в логи Railway
-        Console.WriteLine($"Получено обновление: {update.Type}");
-
         if (update.CallbackQuery != null)
         {
-            await HandleCallback(botClient, update.CallbackQuery, ct);
+            await HandleCallback(bot, update.CallbackQuery, ct);
             return;
         }
 
@@ -83,46 +54,42 @@ class Program
         var chatId = update.Message.Chat.Id;
         var text = update.Message.Text.Trim();
 
-        Console.WriteLine($"Сообщение от {chatId}: {text}");
-
         if (waitingForCity)
         {
             currentCity = text;
             currentCityRu = text;
             waitingForCity = false;
-            await botClient.SendMessage(chatId, $"✅ Выбран город: {text}", cancellationToken: ct);
+            // сразу показываем меню с погодой и временем для нового города
             await SendMainMenu(chatId, ct);
             return;
         }
 
-        // На любое текстовое сообщение показываем меню
         await SendMainMenu(chatId, ct);
     }
 
-    // ===== Обработка нажатий на кнопки =====
-    static async Task HandleCallback(ITelegramBotClient botClient, CallbackQuery query, CancellationToken ct)
+    static async Task HandleCallback(ITelegramBotClient bot, CallbackQuery query, CancellationToken ct)
     {
         var chatId = query.Message.Chat.Id;
         var data = query.Data;
 
-        await botClient.AnswerCallbackQuery(query.Id, cancellationToken: ct);
+        await bot.AnswerCallbackQuery(query.Id, cancellationToken: ct);
 
         if (data == "weather")
         {
             var msg = await GetWeather();
-            await botClient.SendMessage(chatId, msg, cancellationToken: ct);
+            await bot.SendMessage(chatId, msg, cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "time")
         {
             var msg = GetTime();
-            await botClient.SendMessage(chatId, msg, cancellationToken: ct);
+            await bot.SendMessage(chatId, msg, cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "news")
         {
             var msg = await GetNews();
-            await botClient.SendMessage(chatId, msg, cancellationToken: ct);
+            await bot.SendMessage(chatId, msg, cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "choose_city")
@@ -133,20 +100,18 @@ class Program
         {
             currentCity = "Almetyevsk";
             currentCityRu = "Альметьевск";
-            await botClient.SendMessage(chatId, "✅ Выбран город: Альметьевск 🇷🇺", cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "city_shymkent")
         {
             currentCity = "Shymkent";
             currentCityRu = "Шымкент";
-            await botClient.SendMessage(chatId, "✅ Выбран город: Шымкент 🇰🇿", cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "city_custom")
         {
             waitingForCity = true;
-            await botClient.SendMessage(chatId,
+            await bot.SendMessage(chatId,
                 "✏️ Напиши название города на английском языке\nНапример: Moscow, London, Paris",
                 cancellationToken: ct);
         }
@@ -156,34 +121,36 @@ class Program
         }
     }
 
-    // ===== Главное меню =====
     static async Task SendMainMenu(long chatId, CancellationToken ct)
     {
+        // Получаем погоду и время
+        var weatherTask = GetWeather();
+        var timeString = GetTime();
+
+        var weather = await weatherTask; // дожидаемся погоды
+
+        var text = $"🏙 Текущий город: *{currentCityRu}*\n" +
+                   $"{timeString}\n" +
+                   $"{weather}\n\n" +
+                   $"Выберите действие:";
+
         var keyboard = new InlineKeyboardMarkup(new[]
         {
-            new[]
-            {
-                InlineKeyboardButton.WithCallbackData("🌤 Погода", "weather"),
-                InlineKeyboardButton.WithCallbackData("🕐 Время", "time"),
-            },
-            new[]
-            {
-                InlineKeyboardButton.WithCallbackData("📰 Новости", "news"),
-            },
-            new[]
-            {
-                InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city"),
-            }
-        });
+        new[]
+        {
+            InlineKeyboardButton.WithCallbackData("📰 Новости", "news"),
+        },
+        new[]
+        {
+            InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city"),
+        }
+    });
 
-        await bot.SendMessage(chatId,
-            $"🏙 Текущий город: *{currentCityRu}*\n\nВыбери действие:",
+        await bot.SendMessage(chatId, text,
             parseMode: ParseMode.Markdown,
             replyMarkup: keyboard,
             cancellationToken: ct);
     }
-
-    // ===== Меню выбора города =====
     static async Task SendCityMenu(long chatId, CancellationToken ct)
     {
         var keyboard = new InlineKeyboardMarkup(new[]
@@ -209,7 +176,6 @@ class Program
         await bot.SendMessage(chatId, "🌍 Выбери город:", replyMarkup: keyboard, cancellationToken: ct);
     }
 
-    // ===== Получение погоды =====
     static async Task<string> GetWeather()
     {
         try
@@ -237,7 +203,6 @@ class Program
         }
     }
 
-    // ===== Получение времени =====
     static string GetTime()
     {
         string tzId;
@@ -259,7 +224,6 @@ class Program
         }
     }
 
-    // ===== Получение новостей =====
     static async Task<string> GetNews()
     {
         try
@@ -299,8 +263,7 @@ class Program
         }
     }
 
-    // ===== Обработчик ошибок бота =====
-    static Task HandleError(ITelegramBotClient botClient, Exception ex, HandleErrorSource source, CancellationToken ct)
+    static Task HandleError(ITelegramBotClient bot, Exception ex, HandleErrorSource source, CancellationToken ct)
     {
         Console.WriteLine($"Ошибка: {ex.Message}");
         return Task.CompletedTask;
