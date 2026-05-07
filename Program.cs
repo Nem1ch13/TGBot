@@ -28,9 +28,12 @@ class Program
     static string currentCityRu = "Альметьевск";
     static bool waitingForCity = false;
 
-    // Запоминаем ID последнего сообщения бота для каждого чата
+    // Храним ID последнего сообщения бота (не главного меню) для удаления
     static Dictionary<long, int> lastBotMessageId = new Dictionary<long, int>();
+    // Храним ID и FileId фото главного меню для редактирования
+    static Dictionary<long, (int MessageId, string? PhotoFileId)> mainMenuMessages = new();
 
+    // Словарь с картинками городов (добавил много новых)
     static Dictionary<string, CityImages> cityImages = new Dictionary<string, CityImages>
     {
         ["Almetyevsk"] = new CityImages
@@ -44,6 +47,37 @@ class Program
             Day    = "https://avatars.mds.yandex.net/i?id=23b3468cd84a555f5ad7feecb4f9fbef_l-5288220-images-thumbs&n=13",
             Evening = "https://informburo.kz/storage/photos/oldArticle/main/SRhiOULsnSUvifkd.jpg",
             Night  = "https://i.ytimg.com/vi/F1PKeSICD-c/maxresdefault.jpg"
+        },
+        // Новые города (фоны подобраны из надёжных источников)
+        ["Moscow"] = new CityImages
+        {
+            Day     = "https://images.unsplash.com/photo-1512495039889-59f5c85e3d47?w=800",
+            Evening = "https://images.unsplash.com/photo-1512061943748-51e8b0d12a8b?w=800",
+            Night   = "https://images.unsplash.com/photo-1506665531195-42ddc3e9c7c9?w=800"
+        },
+        ["Saint Petersburg"] = new CityImages
+        {
+            Day     = "https://images.unsplash.com/photo-1598618216261-b0d1c5aed8ee?w=800",
+            Evening = "https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800",
+            Night   = "https://images.unsplash.com/photo-1544003627-b97ca69a2b2e?w=800"
+        },
+        ["Kazan"] = new CityImages
+        {
+            Day     = "https://images.unsplash.com/photo-1589569260856-80f4c56011d2?w=800",
+            Evening = "https://images.unsplash.com/photo-1548346481-3d3a03d3fd0b?w=800",
+            Night   = "https://images.unsplash.com/photo-1575065022816-f7b1d8b5bde9?w=800"
+        },
+        ["Istanbul"] = new CityImages
+        {
+            Day     = "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=800",
+            Evening = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800",
+            Night   = "https://images.unsplash.com/photo-1541432901042-2d4bf86cd438?w=800"
+        },
+        ["Almaty"] = new CityImages
+        {
+            Day     = "https://images.unsplash.com/photo-1589733955747-6d774947a6af?w=800",
+            Evening = "https://images.unsplash.com/photo-1567529662178-1b13c7501013?w=800",
+            Night   = "https://images.unsplash.com/photo-1520095328616-0666d3bdb6e5?w=800"
         },
         ["default"] = new CityImages
         {
@@ -62,6 +96,7 @@ class Program
 
     static async Task Main()
     {
+        // Веб-сервер для Railway healthcheck
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
@@ -79,6 +114,7 @@ class Program
 
         _ = host.RunAsync();
 
+        // Запуск бота
         bot = new TelegramBotClient(TG_TOKEN);
         var cts = new CancellationTokenSource();
         bot.StartReceiving(
@@ -90,6 +126,7 @@ class Program
 
         var me = await bot.GetMe();
         Console.WriteLine($"Бот @{me.Username} запущен!");
+
         await Task.Delay(Timeout.Infinite, cts.Token);
     }
 
@@ -106,7 +143,7 @@ class Program
         var chatId = update.Message.Chat.Id;
         var text = update.Message.Text.Trim();
 
-        // Удаляем сообщение пользователя чтобы не засорять чат
+        // Удаляем сообщение пользователя, чтобы не засорять чат
         try { await bot.DeleteMessage(chatId, update.Message.MessageId, ct); } catch { }
 
         if (waitingForCity)
@@ -126,52 +163,69 @@ class Program
 
         await botClient.AnswerCallbackQuery(query.Id, cancellationToken: ct);
 
-        if (data == "news")
+        // Нажатие "Назад" в дополнительных сообщениях
+        if (data == "back")
         {
-            // Удаляем предыдущее сообщение и показываем новости с кнопкой Назад
             await DeleteLastMessage(chatId, ct);
-            var msg = await GetNews();
+            await SendMainMenu(chatId, ct);
+            return;
+        }
+
+        // Новости, прогноз, курсы отправляем как отдельное сообщение с кнопкой Назад
+        if (data == "news" || data == "forecast" || data == "rates")
+        {
+            string msgText = data switch
+            {
+                "news" => await GetNews(),
+                "forecast" => await GetForecast(),
+                "rates" => await GetRates(),
+                _ => "Неизвестная команда"
+            };
+
+            await DeleteLastMessage(chatId, ct); // удаляем предыдущее доп. сообщение, если было
             var keyboard = new InlineKeyboardMarkup(new[]
             {
                 new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") }
             });
-            var sent = await bot.SendMessage(chatId, msg, replyMarkup: keyboard, cancellationToken: ct);
+            var sent = await bot.SendMessage(chatId, msgText,
+                replyMarkup: keyboard, cancellationToken: ct);
             lastBotMessageId[chatId] = sent.MessageId;
+            return;
         }
-        else if (data == "choose_city")
+
+        // Выбор города из меню
+        if (data == "choose_city")
         {
-            await DeleteLastMessage(chatId, ct);
             await SendCityMenu(chatId, ct);
+            return;
         }
-        else if (data == "city_almetyevsk")
-        {
-            currentCity = "Almetyevsk";
-            currentCityRu = "Альметьевск";
-            await DeleteLastMessage(chatId, ct);
-            await SendMainMenu(chatId, ct);
-        }
-        else if (data == "city_shymkent")
-        {
-            currentCity = "Shymkent";
-            currentCityRu = "Шымкент";
-            await DeleteLastMessage(chatId, ct);
-            await SendMainMenu(chatId, ct);
-        }
+        if (data == "city_almetyevsk") { SetCity("Almetyevsk", "Альметьевск"); }
+        else if (data == "city_shymkent") { SetCity("Shymkent", "Шымкент"); }
+        else if (data == "city_moscow") { SetCity("Moscow", "Москва"); }
+        else if (data == "city_spb") { SetCity("Saint Petersburg", "Санкт-Петербург"); }
+        else if (data == "city_kazan") { SetCity("Kazan", "Казань"); }
+        else if (data == "city_istanbul") { SetCity("Istanbul", "Стамбул"); }
+        else if (data == "city_almaty") { SetCity("Almaty", "Алматы"); }
         else if (data == "city_custom")
         {
             waitingForCity = true;
-            await botClient.AnswerCallbackQuery(query.Id, cancellationToken: ct);
             await DeleteLastMessage(chatId, ct);
             var sent = await bot.SendMessage(chatId,
                 "✏️ Напиши название города на английском языке\nНапример: Moscow, London, Paris",
                 cancellationToken: ct);
             lastBotMessageId[chatId] = sent.MessageId;
+            return;
         }
-        else if (data == "back")
-        {
-            await DeleteLastMessage(chatId, ct);
-            await SendMainMenu(chatId, ct);
-        }
+        else return;
+
+        // После смены города обновляем главное меню
+        await SendMainMenu(chatId, ct);
+    }
+
+    static void SetCity(string eng, string ru)
+    {
+        currentCity = eng;
+        currentCityRu = ru;
     }
 
     static async Task DeleteLastMessage(long chatId, CancellationToken ct)
@@ -183,64 +237,102 @@ class Program
         }
     }
 
-    static async Task SendMainMenu(long chatId, CancellationToken ct)
+    // Главное меню с редактированием
+    static async Task SendMainMenu(long chatId, CancellationToken ct, bool editIfPossible = true)
     {
-        var (weatherText, _) = await GetWeather();
-        var timeString = GetTime();
-        var timeOfDay = GetTimeOfDay();
-
-        var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
-                      $"{timeString}\n" +
-                      $"{weatherText}\n\n" +
-                      $"Выберите действие:";
-
-        var keyboard = new InlineKeyboardMarkup(new[]
+        // Пробуем отредактировать существующее главное сообщение
+        if (editIfPossible && mainMenuMessages.TryGetValue(chatId, out var oldMsg))
         {
-            new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news") },
-            new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
+            try
+            {
+                var (weatherText, _) = await GetWeather();
+                var timeString = GetTime();
+                var timeOfDay = GetTimeOfDay();
+                var caption = $"🏙 *{currentCityRu}*\n{timeString}\n{weatherText}\n\nВыберите действие:";
+                var keyboard = new InlineKeyboardMarkup(new[]
+                {
+                    new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news"),
+                            InlineKeyboardButton.WithCallbackData("📆 Прогноз", "forecast") },
+                    new[] { InlineKeyboardButton.WithCallbackData("💵 Курсы", "rates"),
+                            InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
+                });
+
+                if (oldMsg.PhotoFileId != null)
+                {
+                    await bot.EditMessageCaption(chatId, oldMsg.MessageId, caption,
+                        parseMode: ParseMode.Markdown,
+                        replyMarkup: keyboard,
+                        cancellationToken: ct);
+                }
+                else
+                {
+                    await bot.EditMessageText(chatId, oldMsg.MessageId, caption,
+                        parseMode: ParseMode.Markdown,
+                        replyMarkup: keyboard,
+                        cancellationToken: ct);
+                }
+                return;
+            }
+            catch { /* не удалось отредактировать — отправляем новое */ }
+        }
+
+        // Отправка нового главного сообщения (с фото или без)
+        var (weatherTextNew, _) = await GetWeather();
+        var timeStringNew = GetTime();
+        var timeOfDayNew = GetTimeOfDay();
+        var captionNew = $"🏙 *{currentCityRu}*\n{timeStringNew}\n{weatherTextNew}\n\nВыберите действие:";
+        var keyboardNew = new InlineKeyboardMarkup(new[]
+        {
+            new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news"),
+                    InlineKeyboardButton.WithCallbackData("📆 Прогноз", "forecast") },
+            new[] { InlineKeyboardButton.WithCallbackData("💵 Курсы", "rates"),
+                    InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
         });
 
-        string? imageUrl = GetCityImageUrl(currentCity, timeOfDay);
+        string? imageUrl = GetCityImageUrl(currentCity, timeOfDayNew);
         Message? sent = null;
 
         if (!string.IsNullOrEmpty(imageUrl))
         {
             try
             {
-                sent = await bot.SendPhoto(
-                    chatId: chatId,
-                    photo: InputFile.FromUri(imageUrl),
-                    caption: caption,
+                sent = await bot.SendPhoto(chatId, InputFile.FromUri(imageUrl),
+                    caption: captionNew,
                     parseMode: ParseMode.Markdown,
-                    replyMarkup: keyboard,
+                    replyMarkup: keyboardNew,
                     cancellationToken: ct);
+                mainMenuMessages[chatId] = (sent.MessageId, sent.Photo?.FirstOrDefault()?.FileId);
             }
             catch
             {
-                sent = await bot.SendMessage(chatId, caption,
+                sent = await bot.SendMessage(chatId, captionNew,
                     parseMode: ParseMode.Markdown,
-                    replyMarkup: keyboard,
+                    replyMarkup: keyboardNew,
                     cancellationToken: ct);
+                mainMenuMessages[chatId] = (sent.MessageId, null);
             }
         }
         else
         {
-            sent = await bot.SendMessage(chatId, caption,
+            sent = await bot.SendMessage(chatId, captionNew,
                 parseMode: ParseMode.Markdown,
-                replyMarkup: keyboard,
+                replyMarkup: keyboardNew,
                 cancellationToken: ct);
+            mainMenuMessages[chatId] = (sent.MessageId, null);
         }
-
-        if (sent != null)
-            lastBotMessageId[chatId] = sent.MessageId;
     }
 
     static async Task SendCityMenu(long chatId, CancellationToken ct)
     {
         var keyboard = new InlineKeyboardMarkup(new[]
         {
-            new[] { InlineKeyboardButton.WithCallbackData("🇷🇺 Альметьевск", "city_almetyevsk") },
-            new[] { InlineKeyboardButton.WithCallbackData("🇰🇿 Шымкент", "city_shymkent") },
+            new[] { InlineKeyboardButton.WithCallbackData("🇷🇺 Альметьевск", "city_almetyevsk"),
+                    InlineKeyboardButton.WithCallbackData("🇰🇿 Шымкент", "city_shymkent") },
+            new[] { InlineKeyboardButton.WithCallbackData("🇷🇺 Москва", "city_moscow"),
+                    InlineKeyboardButton.WithCallbackData("🇷🇺 Санкт-Петербург", "city_spb") },
+            new[] { InlineKeyboardButton.WithCallbackData("🇷🇺 Казань", "city_kazan"),
+                    InlineKeyboardButton.WithCallbackData("🇹🇷 Стамбул", "city_istanbul") },
+            new[] { InlineKeyboardButton.WithCallbackData("🇰🇿 Алматы", "city_almaty") },
             new[] { InlineKeyboardButton.WithCallbackData("✏️ Другой город", "city_custom") },
             new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") }
         });
@@ -249,9 +341,16 @@ class Program
         lastBotMessageId[chatId] = sent.MessageId;
     }
 
+    // ----------------- Время и таймзоны -----------------
     static DateTime GetLocalDateTime()
     {
-        string tzId = currentCity == "Shymkent" ? "West Asia Standard Time" : "Russian Standard Time";
+        string tzId = currentCity switch
+        {
+            "Shymkent" or "Almaty" => "West Asia Standard Time",       // UTC+5
+            "Moscow" or "Saint Petersburg" or "Kazan" => "Russian Standard Time", // UTC+3
+            "Istanbul" => "Turkey Standard Time",                      // UTC+3
+            _ => "Russian Standard Time"                               // Альметьевск и др.
+        };
         try
         {
             var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
@@ -259,7 +358,11 @@ class Program
         }
         catch
         {
-            int offset = currentCity == "Shymkent" ? 5 : 3;
+            int offset = currentCity switch
+            {
+                "Shymkent" or "Almaty" => 5,
+                _ => 3
+            };
             return DateTime.UtcNow.AddHours(offset);
         }
     }
@@ -273,9 +376,9 @@ class Program
     static string GetTimeOfDay()
     {
         var hour = GetLocalDateTime().Hour;
-        if (hour >= 5 && hour < 12) return "evening";
-        if (hour >= 12 && hour < 18) return "day";
-        return "night";
+        if (hour >= 5 && hour < 12) return "evening";   // утро/вечер
+        if (hour >= 12 && hour < 18) return "day";      // день
+        return "night";                                  // ночь
     }
 
     static string? GetCityImageUrl(string city, string timeOfDay)
@@ -290,6 +393,7 @@ class Program
         };
     }
 
+    // ----------------- Погода -----------------
     static async Task<(string text, string? iconUrl)> GetWeather()
     {
         try
@@ -321,6 +425,43 @@ class Program
         }
     }
 
+    // ----------------- Прогноз на 3 дня -----------------
+    static async Task<string> GetForecast()
+    {
+        try
+        {
+            var url = $"https://api.openweathermap.org/data/2.5/forecast?q={currentCity}&appid={WEATHER_KEY}&units=metric&lang=ru";
+            var json = JObject.Parse(await http.GetStringAsync(url));
+            var list = json["list"] as JArray;
+            if (list == null || list.Count == 0) return "Прогноз не найден.";
+
+            var daily = new Dictionary<string, (double min, double max, string desc)>();
+            foreach (var item in list)
+            {
+                var dt = DateTime.Parse(item["dt_txt"].ToString());
+                var day = dt.ToString("dd.MM (ddd)");
+                var temp = item["main"]["temp"].Value<double>();
+                var desc = item["weather"][0]["description"].ToString();
+                if (!daily.ContainsKey(day))
+                    daily[day] = (temp, temp, desc);
+                else
+                {
+                    var cur = daily[day];
+                    daily[day] = (Math.Min(cur.min, temp), Math.Max(cur.max, temp), cur.desc);
+                }
+            }
+
+            var result = $"📆 Прогноз в {currentCityRu}:\n\n";
+            foreach (var d in daily.Take(3))
+            {
+                result += $"{d.Key}: {d.Value.min:F0}°…{d.Value.max:F0}°, {d.Value.desc}\n";
+            }
+            return result;
+        }
+        catch (Exception ex) { return $"❌ Ошибка прогноза: {ex.Message}"; }
+    }
+
+    // ----------------- Новости -----------------
     static async Task<string> GetNews()
     {
         try
@@ -329,10 +470,9 @@ class Program
             var url = $"https://news.google.com/rss/search?q={query}&hl=ru&gl=RU&ceid=RU:ru";
 
             var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            request.Headers.Add("User-Agent", "Mozilla/5.0");
             var response = await http.SendAsync(request);
             var content = await response.Content.ReadAsStringAsync();
-
             var xml = XDocument.Parse(content);
             var items = xml.Descendants("item");
 
@@ -354,10 +494,24 @@ class Program
             }
             return result;
         }
-        catch (Exception ex)
+        catch (Exception ex) { return $"❌ Ошибка новостей: {ex.Message}"; }
+    }
+
+    // ----------------- Курсы валют -----------------
+    static async Task<string> GetRates()
+    {
+        try
         {
-            return $"❌ Ошибка новостей: {ex.Message}";
+            var json = JObject.Parse(await http.GetStringAsync("https://api.exchangerate-api.com/v4/latest/USD"));
+            var usdToRub = json["rates"]["RUB"]?.Value<decimal>() ?? 0;
+            var usdToKzt = json["rates"]["KZT"]?.Value<decimal>() ?? 0;
+            var rubToKzt = usdToKzt / usdToRub;
+            return $"💵 Курсы валют:\n" +
+                   $"$1 = {usdToRub:F2} ₽\n" +
+                   $"$1 = {usdToKzt:F2} ₸\n" +
+                   $"1 ₽ = {rubToKzt:F2} ₸";
         }
+        catch { return "❌ Не удалось загрузить курсы."; }
     }
 
     static Task HandleError(ITelegramBotClient botClient, Exception ex, HandleErrorSource source, CancellationToken ct)
