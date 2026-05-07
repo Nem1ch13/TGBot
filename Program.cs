@@ -199,7 +199,7 @@ class Program
         }
         catch (Exception ex)
         {
-            return $"❌ Ошибка погоды: {ex.Message}";
+            return $"❌ Ошибка токена погоды: {ex.Message}";
         }
     }
 
