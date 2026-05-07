@@ -29,7 +29,7 @@ class Program
 
     static async Task Main()
     {
-        // ===== Встроенный веб-сервер для Railway healthcheck =====
+        // ===== Веб-сервер для Railway =====
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
@@ -47,7 +47,7 @@ class Program
 
         _ = host.RunAsync();
 
-        // ===== Запуск телеграм-бота =====
+        // ===== Бот =====
         bot = new TelegramBotClient(TG_TOKEN);
         var cts = new CancellationTokenSource();
         bot.StartReceiving(
@@ -60,16 +60,16 @@ class Program
         var me = await bot.GetMe();
         Console.WriteLine($"Бот @{me.Username} запущен!");
 
-        // Бесконечное ожидание, чтобы контейнер не падал
         await Task.Delay(Timeout.Infinite, cts.Token);
     }
 
-    static async Task HandleUpdate(ITelegramBotClient bot, Update update, CancellationToken ct)
+    static async Task HandleUpdate(ITelegramBotClient botClient, Update update, CancellationToken ct)
     {
         Console.WriteLine($"Получено обновление: {update.Type}");
+
         if (update.CallbackQuery != null)
         {
-            await HandleCallback(bot, update.CallbackQuery, ct);
+            await HandleCallback(botClient, update.CallbackQuery, ct);
             return;
         }
 
@@ -92,17 +92,17 @@ class Program
         await SendMainMenu(chatId, ct);
     }
 
-    static async Task HandleCallback(ITelegramBotClient bot, CallbackQuery query, CancellationToken ct)
+    static async Task HandleCallback(ITelegramBotClient botClient, CallbackQuery query, CancellationToken ct)
     {
         var chatId = query.Message.Chat.Id;
         var data = query.Data;
 
-        await bot.AnswerCallbackQuery(query.Id, cancellationToken: ct);
+        await botClient.AnswerCallbackQuery(query.Id, cancellationToken: ct);
 
         if (data == "news")
         {
             var msg = await GetNews();
-            await bot.SendMessage(chatId, msg, cancellationToken: ct);
+            await botClient.SendMessage(chatId, msg, cancellationToken: ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "choose_city")
@@ -124,7 +124,7 @@ class Program
         else if (data == "city_custom")
         {
             waitingForCity = true;
-            await bot.SendMessage(chatId,
+            await botClient.SendMessage(chatId,
                 "✏️ Напиши название города на английском языке\nНапример: Moscow, London, Paris",
                 cancellationToken: ct);
         }
@@ -132,47 +132,44 @@ class Program
         {
             await SendMainMenu(chatId, ct);
         }
-        // Обработчики "weather" и "time" больше не нужны, удалил
     }
 
-  static async Task SendMainMenu(long chatId, CancellationToken ct)
-{
-    var (weatherText, iconUrl) = await GetWeather();
-    var timeString = GetTime();
-
-    var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
-                  $"{timeString}\n" +
-                  $"{weatherText}\n\n" +
-                  $"Выберите действие:";
-
-    var keyboard = new InlineKeyboardMarkup(new[]
+    static async Task SendMainMenu(long chatId, CancellationToken ct)
     {
-        new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news") },
-        new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
-    });
+        var (weatherText, iconUrl) = await GetWeather();
+        var timeString = GetTime();
 
-    if (!string.IsNullOrEmpty(iconUrl))
-    {
-        // Отправляем фото с подписью и кнопками
-        await bot.SendPhotoAsync(
-            chatId: chatId,
-            photo: InputFile.FromUri(iconUrl),
-            caption: caption,
-            parseMode: ParseMode.Markdown,
-            replyMarkup: keyboard,
-            cancellationToken: ct);
+        var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
+                      $"{timeString}\n" +
+                      $"{weatherText}\n\n" +
+                      $"Выберите действие:";
+
+        var keyboard = new InlineKeyboardMarkup(new[]
+        {
+            new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news") },
+            new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
+        });
+
+        if (!string.IsNullOrEmpty(iconUrl))
+        {
+            await bot.SendPhoto(
+                chatId: chatId,
+                photo: InputFile.FromUri(iconUrl),
+                caption: caption,
+                parseMode: ParseMode.Markdown,
+                replyMarkup: keyboard,
+                cancellationToken: ct);
+        }
+        else
+        {
+            await bot.SendMessage(
+                chatId: chatId,
+                text: caption,
+                parseMode: ParseMode.Markdown,
+                replyMarkup: keyboard,
+                cancellationToken: ct);
+        }
     }
-    else
-    {
-        // Если иконки нет, отправляем обычное текстовое сообщение
-        await bot.SendMessage(
-            chatId: chatId,
-            text: caption,
-            parseMode: ParseMode.Markdown,
-            replyMarkup: keyboard,
-            cancellationToken: ct);
-    }
-}
 
     static async Task SendCityMenu(long chatId, CancellationToken ct)
     {
@@ -187,40 +184,40 @@ class Program
         await bot.SendMessage(chatId, "🌍 Выбери город:", replyMarkup: keyboard, cancellationToken: ct);
     }
 
-    // Методы GetWeather, GetTime, GetNews оставь без изменений, как в твоём коде
-   static async Task<(string text, string? iconUrl)> GetWeather()
-{
-    try
+    static async Task<(string text, string? iconUrl)> GetWeather()
     {
-        var url = $"https://api.openweathermap.org/data/2.5/weather?q={currentCity}&appid={WEATHER_KEY}&units=metric&lang=ru";
-        var response = await http.GetStringAsync(url);
-        var json = JObject.Parse(response);
+        try
+        {
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={currentCity}&appid={WEATHER_KEY}&units=metric&lang=ru";
+            var response = await http.GetStringAsync(url);
+            var json = JObject.Parse(response);
 
-        var temp = json["main"]["temp"];
-        var feels = json["main"]["feels_like"];
-        var desc = json["weather"][0]["description"];
-        var humidity = json["main"]["humidity"];
-        var wind = json["wind"]["speed"];
-        var icon = json["weather"][0]["icon"]?.ToString();
+            var temp = json["main"]["temp"];
+            var feels = json["main"]["feels_like"];
+            var desc = json["weather"][0]["description"];
+            var humidity = json["main"]["humidity"];
+            var wind = json["wind"]["speed"];
+            var icon = json["weather"][0]["icon"]?.ToString();
 
-        string? iconUrl = null;
-        if (!string.IsNullOrEmpty(icon))
-            iconUrl = $"https://openweathermap.org/img/wn/{icon}@2x.png";
+            string? iconUrl = null;
+            if (!string.IsNullOrEmpty(icon))
+                iconUrl = $"https://openweathermap.org/img/wn/{icon}@2x.png";
 
-        var text = $"🌤 Погода в {currentCityRu}:\n" +
-                   $"🌡 Температура: {temp:F0}°C\n" +
-                   $"🤔 Ощущается как: {feels:F0}°C\n" +
-                   $"💧 Влажность: {humidity}%\n" +
-                   $"💨 Ветер: {wind} м/с\n" +
-                   $"☁ {desc}";
+            var text = $"🌤 Погода в {currentCityRu}:\n" +
+                       $"🌡 Температура: {temp:F0}°C\n" +
+                       $"🤔 Ощущается как: {feels:F0}°C\n" +
+                       $"💧 Влажность: {humidity}%\n" +
+                       $"💨 Ветер: {wind} м/с\n" +
+                       $"☁ {desc}";
 
-        return (text, iconUrl);
+            return (text, iconUrl);
+        }
+        catch (Exception ex)
+        {
+            return ($"❌ Ошибка погоды: {ex.Message}", null);
+        }
     }
-    catch (Exception ex)
-    {
-        return ($"❌ Ошибка погоды: {ex.Message}", null);
-    }
-}
+
     static string GetTime()
     {
         string tzId;
@@ -244,8 +241,6 @@ class Program
 
     static async Task<string> GetNews()
     {
-        // Оставь свою текущую реализацию, она рабочая
-        // Я вставлю сокращённо, но ты вставь свой полный метод GetNews
         try
         {
             var query = Uri.EscapeDataString(currentCityRu);
@@ -283,7 +278,7 @@ class Program
         }
     }
 
-    static Task HandleError(ITelegramBotClient bot, Exception ex, HandleErrorSource source, CancellationToken ct)
+    static Task HandleError(ITelegramBotClient botClient, Exception ex, HandleErrorSource source, CancellationToken ct)
     {
         Console.WriteLine($"Ошибка: {ex.Message}");
         return Task.CompletedTask;
