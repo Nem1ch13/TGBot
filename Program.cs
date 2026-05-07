@@ -39,7 +39,7 @@ class Program
         },
         ["Shymkent"] = new CityImages
         {
-            Day    = "https://img51994.poehali.tv/img/2024-04-22/fmt_114_24_dji_0032.jpg",
+            Day    = "https://avatars.mds.yandex.net/i?id=23b3468cd84a555f5ad7feecb4f9fbef_l-5288220-images-thumbs&n=13",
             Evening = "https://informburo.kz/storage/photos/oldArticle/main/SRhiOULsnSUvifkd.jpg",
             Night  = "https://i.ytimg.com/vi/F1PKeSICD-c/maxresdefault.jpg"
         },
