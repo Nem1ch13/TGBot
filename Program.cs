@@ -135,28 +135,44 @@ class Program
         // Обработчики "weather" и "time" больше не нужны, удалил
     }
 
-    static async Task SendMainMenu(long chatId, CancellationToken ct)
+  static async Task SendMainMenu(long chatId, CancellationToken ct)
+{
+    var (weatherText, iconUrl) = await GetWeather();
+    var timeString = GetTime();
+
+    var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
+                  $"{timeString}\n" +
+                  $"{weatherText}\n\n" +
+                  $"Выберите действие:";
+
+    var keyboard = new InlineKeyboardMarkup(new[]
     {
-        var weatherTask = GetWeather();
-        var timeString = GetTime();
-        var weather = await weatherTask;
+        new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news") },
+        new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
+    });
 
-        var text = $"🏙 Текущий город: *{currentCityRu}*\n" +
-                   $"{timeString}\n" +
-                   $"{weather}\n\n" +
-                   $"Выберите действие:";
-
-        var keyboard = new InlineKeyboardMarkup(new[]
-        {
-            new[] { InlineKeyboardButton.WithCallbackData("📰 Новости", "news") },
-            new[] { InlineKeyboardButton.WithCallbackData("🌍 Выбрать город", "choose_city") }
-        });
-
-        await bot.SendMessage(chatId, text,
+    if (!string.IsNullOrEmpty(iconUrl))
+    {
+        // Отправляем фото с подписью и кнопками
+        await bot.SendPhotoAsync(
+            chatId: chatId,
+            photo: InputFile.FromUri(iconUrl),
+            caption: caption,
             parseMode: ParseMode.Markdown,
             replyMarkup: keyboard,
             cancellationToken: ct);
     }
+    else
+    {
+        // Если иконки нет, отправляем обычное текстовое сообщение
+        await bot.SendMessage(
+            chatId: chatId,
+            text: caption,
+            parseMode: ParseMode.Markdown,
+            replyMarkup: keyboard,
+            cancellationToken: ct);
+    }
+}
 
     static async Task SendCityMenu(long chatId, CancellationToken ct)
     {
@@ -172,33 +188,39 @@ class Program
     }
 
     // Методы GetWeather, GetTime, GetNews оставь без изменений, как в твоём коде
-    static async Task<string> GetWeather()
+   static async Task<(string text, string? iconUrl)> GetWeather()
+{
+    try
     {
-        try
-        {
-            var url = $"https://api.openweathermap.org/data/2.5/weather?q={currentCity}&appid={WEATHER_KEY}&units=metric&lang=ru";
-            var response = await http.GetStringAsync(url);
-            var json = JObject.Parse(response);
+        var url = $"https://api.openweathermap.org/data/2.5/weather?q={currentCity}&appid={WEATHER_KEY}&units=metric&lang=ru";
+        var response = await http.GetStringAsync(url);
+        var json = JObject.Parse(response);
 
-            var temp = json["main"]["temp"];
-            var feels = json["main"]["feels_like"];
-            var desc = json["weather"][0]["description"];
-            var humidity = json["main"]["humidity"];
-            var wind = json["wind"]["speed"];
+        var temp = json["main"]["temp"];
+        var feels = json["main"]["feels_like"];
+        var desc = json["weather"][0]["description"];
+        var humidity = json["main"]["humidity"];
+        var wind = json["wind"]["speed"];
+        var icon = json["weather"][0]["icon"]?.ToString();
 
-            return $"🌤 Погода в {currentCityRu}:\n" +
+        string? iconUrl = null;
+        if (!string.IsNullOrEmpty(icon))
+            iconUrl = $"https://openweathermap.org/img/wn/{icon}@2x.png";
+
+        var text = $"🌤 Погода в {currentCityRu}:\n" +
                    $"🌡 Температура: {temp:F0}°C\n" +
                    $"🤔 Ощущается как: {feels:F0}°C\n" +
                    $"💧 Влажность: {humidity}%\n" +
                    $"💨 Ветер: {wind} м/с\n" +
                    $"☁ {desc}";
-        }
-        catch (Exception ex)
-        {
-            return $"❌ Ошибка погоды: {ex.Message}";
-        }
-    }
 
+        return (text, iconUrl);
+    }
+    catch (Exception ex)
+    {
+        return ($"❌ Ошибка погоды: {ex.Message}", null);
+    }
+}
     static string GetTime()
     {
         string tzId;
