@@ -28,7 +28,9 @@ class Program
     static string currentCityRu = "Альметьевск";
     static bool waitingForCity = false;
 
-    // Словарь с твоими ссылками
+    // Запоминаем ID последнего сообщения бота для каждого чата
+    static Dictionary<long, int> lastBotMessageId = new Dictionary<long, int>();
+
     static Dictionary<string, CityImages> cityImages = new Dictionary<string, CityImages>
     {
         ["Almetyevsk"] = new CityImages
@@ -43,7 +45,6 @@ class Program
             Evening = "https://informburo.kz/storage/photos/oldArticle/main/SRhiOULsnSUvifkd.jpg",
             Night  = "https://i.ytimg.com/vi/F1PKeSICD-c/maxresdefault.jpg"
         },
-        // Для любого другого города – заглушки
         ["default"] = new CityImages
         {
             Day    = "https://i.ibb.co/0jQp5vL/default-day.jpg",
@@ -61,7 +62,6 @@ class Program
 
     static async Task Main()
     {
-        // Веб-сервер для Railway
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
@@ -79,7 +79,6 @@ class Program
 
         _ = host.RunAsync();
 
-        // Бот
         bot = new TelegramBotClient(TG_TOKEN);
         var cts = new CancellationTokenSource();
         bot.StartReceiving(
@@ -91,14 +90,11 @@ class Program
 
         var me = await bot.GetMe();
         Console.WriteLine($"Бот @{me.Username} запущен!");
-
         await Task.Delay(Timeout.Infinite, cts.Token);
     }
 
     static async Task HandleUpdate(ITelegramBotClient botClient, Update update, CancellationToken ct)
     {
-        Console.WriteLine($"Получено обновление: {update.Type}");
-
         if (update.CallbackQuery != null)
         {
             await HandleCallback(botClient, update.CallbackQuery, ct);
@@ -110,15 +106,14 @@ class Program
         var chatId = update.Message.Chat.Id;
         var text = update.Message.Text.Trim();
 
-        Console.WriteLine($"Сообщение от {chatId}: {text}");
+        // Удаляем сообщение пользователя чтобы не засорять чат
+        try { await bot.DeleteMessage(chatId, update.Message.MessageId, ct); } catch { }
 
         if (waitingForCity)
         {
             currentCity = text;
             currentCityRu = text;
             waitingForCity = false;
-            await SendMainMenu(chatId, ct);
-            return;
         }
 
         await SendMainMenu(chatId, ct);
@@ -133,36 +128,58 @@ class Program
 
         if (data == "news")
         {
+            // Удаляем предыдущее сообщение и показываем новости с кнопкой Назад
+            await DeleteLastMessage(chatId, ct);
             var msg = await GetNews();
-            await botClient.SendMessage(chatId, msg, cancellationToken: ct);
-            await SendMainMenu(chatId, ct);
+            var keyboard = new InlineKeyboardMarkup(new[]
+            {
+                new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") }
+            });
+            var sent = await bot.SendMessage(chatId, msg, replyMarkup: keyboard, cancellationToken: ct);
+            lastBotMessageId[chatId] = sent.MessageId;
         }
         else if (data == "choose_city")
         {
+            await DeleteLastMessage(chatId, ct);
             await SendCityMenu(chatId, ct);
         }
         else if (data == "city_almetyevsk")
         {
             currentCity = "Almetyevsk";
             currentCityRu = "Альметьевск";
+            await DeleteLastMessage(chatId, ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "city_shymkent")
         {
             currentCity = "Shymkent";
             currentCityRu = "Шымкент";
+            await DeleteLastMessage(chatId, ct);
             await SendMainMenu(chatId, ct);
         }
         else if (data == "city_custom")
         {
             waitingForCity = true;
-            await botClient.SendMessage(chatId,
+            await botClient.AnswerCallbackQuery(query.Id, cancellationToken: ct);
+            await DeleteLastMessage(chatId, ct);
+            var sent = await bot.SendMessage(chatId,
                 "✏️ Напиши название города на английском языке\nНапример: Moscow, London, Paris",
                 cancellationToken: ct);
+            lastBotMessageId[chatId] = sent.MessageId;
         }
         else if (data == "back")
         {
+            await DeleteLastMessage(chatId, ct);
             await SendMainMenu(chatId, ct);
+        }
+    }
+
+    static async Task DeleteLastMessage(long chatId, CancellationToken ct)
+    {
+        if (lastBotMessageId.TryGetValue(chatId, out var msgId))
+        {
+            try { await bot.DeleteMessage(chatId, msgId, ct); } catch { }
+            lastBotMessageId.Remove(chatId);
         }
     }
 
@@ -170,7 +187,7 @@ class Program
     {
         var (weatherText, _) = await GetWeather();
         var timeString = GetTime();
-        var timeOfDay = GetTimeOfDay(); // теперь по местному времени
+        var timeOfDay = GetTimeOfDay();
 
         var caption = $"🏙 Текущий город: *{currentCityRu}*\n" +
                       $"{timeString}\n" +
@@ -184,11 +201,13 @@ class Program
         });
 
         string? imageUrl = GetCityImageUrl(currentCity, timeOfDay);
+        Message? sent = null;
+
         if (!string.IsNullOrEmpty(imageUrl))
         {
             try
             {
-                await bot.SendPhoto(
+                sent = await bot.SendPhoto(
                     chatId: chatId,
                     photo: InputFile.FromUri(imageUrl),
                     caption: caption,
@@ -196,12 +215,9 @@ class Program
                     replyMarkup: keyboard,
                     cancellationToken: ct);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Ошибка отправки фото: {ex.Message}. Отправляем текст.");
-                await bot.SendMessage(
-                    chatId: chatId,
-                    text: caption,
+                sent = await bot.SendMessage(chatId, caption,
                     parseMode: ParseMode.Markdown,
                     replyMarkup: keyboard,
                     cancellationToken: ct);
@@ -209,13 +225,14 @@ class Program
         }
         else
         {
-            await bot.SendMessage(
-                chatId: chatId,
-                text: caption,
+            sent = await bot.SendMessage(chatId, caption,
                 parseMode: ParseMode.Markdown,
                 replyMarkup: keyboard,
                 cancellationToken: ct);
         }
+
+        if (sent != null)
+            lastBotMessageId[chatId] = sent.MessageId;
     }
 
     static async Task SendCityMenu(long chatId, CancellationToken ct)
@@ -228,21 +245,13 @@ class Program
             new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") }
         });
 
-        await bot.SendMessage(chatId, "🌍 Выбери город:", replyMarkup: keyboard, cancellationToken: ct);
+        var sent = await bot.SendMessage(chatId, "🌍 Выбери город:", replyMarkup: keyboard, cancellationToken: ct);
+        lastBotMessageId[chatId] = sent.MessageId;
     }
 
-    // ====== Вспомогательные методы для времени ======
-    /// <summary>
-    /// Возвращает DateTime в локальном времени выбранного города.
-    /// </summary>
     static DateTime GetLocalDateTime()
     {
-        string tzId;
-        if (currentCity == "Shymkent")
-            tzId = "West Asia Standard Time"; // UTC+5
-        else
-            tzId = "Russian Standard Time";    // UTC+3
-
+        string tzId = currentCity == "Shymkent" ? "West Asia Standard Time" : "Russian Standard Time";
         try
         {
             var tz = TimeZoneInfo.FindSystemTimeZoneById(tzId);
@@ -250,61 +259,37 @@ class Program
         }
         catch
         {
-            // fallback: предполагаем UTC+3 для Альметьевска и UTC+5 для Шымкента
             int offset = currentCity == "Shymkent" ? 5 : 3;
             return DateTime.UtcNow.AddHours(offset);
         }
     }
 
-    /// <summary>
-    /// Возвращает строку с текущим временем в городе (как раньше).
-    /// </summary>
     static string GetTime()
     {
         var localTime = GetLocalDateTime();
-        return $"🕐 Время в {currentCityRu}:\n{localTime:HH:mm:ss}\n📅 {localTime:dd.MM.yyyy}";
+        return $"🕐 Время: {localTime:HH:mm}\n📅 {localTime:dd.MM.yyyy}";
     }
 
-    /// <summary>
-    /// Определяет время суток по местному времени: "day", "evening" или "night".
-    /// </summary>
     static string GetTimeOfDay()
     {
         var hour = GetLocalDateTime().Hour;
         if (hour >= 5 && hour < 12) return "evening";
-        if (hour >= 12 && hour < 18) return "day"; // 12:00–17:59 считаем вечером/утром
-        return "night";                                   // 18:00–4:59
+        if (hour >= 12 && hour < 18) return "day";
+        return "night";
     }
 
     static string? GetCityImageUrl(string city, string timeOfDay)
     {
-        if (cityImages.ContainsKey(city))
+        var images = cityImages.ContainsKey(city) ? cityImages[city] : cityImages["default"];
+        return timeOfDay switch
         {
-            var images = cityImages[city];
-            return timeOfDay switch
-            {
-                "day" => images.Day,
-                "evening" => images.Evening,
-                "night" => images.Night,
-                _ => null
-            };
-        }
-        // fallback на default
-        if (cityImages.ContainsKey("default"))
-        {
-            var defaultImages = cityImages["default"];
-            return timeOfDay switch
-            {
-                "day" => defaultImages.Day,
-                "evening" => defaultImages.Evening,
-                "night" => defaultImages.Night,
-                _ => null
-            };
-        }
-        return null;
+            "day" => images.Day,
+            "evening" => images.Evening,
+            "night" => images.Night,
+            _ => null
+        };
     }
 
-    // ====== Погода ======
     static async Task<(string text, string? iconUrl)> GetWeather()
     {
         try
@@ -320,26 +305,22 @@ class Program
             var wind = json["wind"]["speed"];
             var icon = json["weather"][0]["icon"]?.ToString();
 
-            string? iconUrl = null;
-            if (!string.IsNullOrEmpty(icon))
-                iconUrl = $"https://openweathermap.org/img/wn/{icon}@2x.png";
+            string? iconUrl = !string.IsNullOrEmpty(icon)
+                ? $"https://openweathermap.org/img/wn/{icon}@2x.png"
+                : null;
 
-            var text = $"🌤 Погода в {currentCityRu}:\n" +
-                       $"🌡 Температура: {temp:F0}°C\n" +
-                       $"🤔 Ощущается как: {feels:F0}°C\n" +
-                       $"💧 Влажность: {humidity}%\n" +
-                       $"💨 Ветер: {wind} м/с\n" +
-                       $"☁ {desc}";
+            var text = $"🌤 Погода:\n" +
+                       $"🌡 {temp:F0}°C (ощущается {feels:F0}°C)\n" +
+                       $"💧 {humidity}% | 💨 {wind} м/с | ☁ {desc}";
 
             return (text, iconUrl);
         }
         catch (Exception ex)
         {
-            return ($"❌ Ошибка погоды: {ex.Message}", null);
+            return ($"❌ Погода недоступна: {ex.Message}", null);
         }
     }
 
-    // ====== Новости ======
     static async Task<string> GetNews()
     {
         try
