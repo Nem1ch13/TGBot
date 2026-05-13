@@ -26,6 +26,22 @@ class Program
     static TelegramBotClient bot = null!;
     static HttpClient http = new HttpClient();
 
+    // Названия валют для кнопок (ключ — код валюты)
+    static readonly Dictionary<string, string> CurrencyNames = new()
+    {
+        ["RUB"] = "🇷🇺 Рубль",
+        ["KZT"] = "🇰🇿 Тенге",
+        ["USD"] = "🇺🇸 Доллар",
+        ["EUR"] = "🇪🇺 Евро",
+        ["GBP"] = "🇬🇧 Фунт",
+        ["CNY"] = "🇨🇳 Юань",
+        ["AED"] = "🇦🇪 Дирхам",
+        ["TRY"] = "🇹🇷 Лира",
+        ["UAH"] = "🇺🇦 Гривна",
+        ["KGS"] = "🇰🇬 Сом",
+        ["UZS"] = "🇺🇿 Сум"
+    };
+
     class UserState
     {
         public string CityEn = "Almetyevsk";
@@ -178,10 +194,10 @@ class Program
                 break;
 
             case "city_almetyevsk": SetCity(user, "Almetyevsk", "Альметьевск"); await EditMainMenu(chatId, user, ct); break;
-            case "city_shymkent": SetCity(user, "Shymkent", "Шымкент"); await EditMainMenu(chatId, user, ct); break;
-            case "city_moscow": SetCity(user, "Moscow", "Москва"); await EditMainMenu(chatId, user, ct); break;
-            case "city_almaty": SetCity(user, "Almaty", "Алматы"); await EditMainMenu(chatId, user, ct); break;
-            case "city_astana": SetCity(user, "Astana", "Астана"); await EditMainMenu(chatId, user, ct); break;
+            case "city_shymkent":   SetCity(user, "Shymkent", "Шымкент");     await EditMainMenu(chatId, user, ct); break;
+            case "city_moscow":     SetCity(user, "Moscow", "Москва");         await EditMainMenu(chatId, user, ct); break;
+            case "city_almaty":     SetCity(user, "Almaty", "Алматы");         await EditMainMenu(chatId, user, ct); break;
+            case "city_astana":     SetCity(user, "Astana", "Астана");         await EditMainMenu(chatId, user, ct); break;
 
             case "city_custom":
                 user.WaitingForCustomCity = true;
@@ -203,11 +219,14 @@ class Program
                 user.ConvertTo = s["convto_".Length..];
                 user.WaitingForAmount = true;
                 await EditOrSendMain(chatId, user, ct,
-                    extra: $"🧮 Введите сумму ({user.ConvertFrom} → {user.ConvertTo}):",
+                    extra: $"🧮 Введите сумму ({CurrencyName(user.ConvertFrom!)} → {CurrencyName(user.ConvertTo!)}):",
                     keyboard: new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("◀️ Отмена", "back") } }));
                 break;
         }
     }
+
+    static string CurrencyName(string code) =>
+        CurrencyNames.TryGetValue(code, out var name) ? name : code;
 
     static void SetCity(UserState user, string en, string ru) { user.CityEn = en; user.CityRu = ru; }
 
@@ -298,25 +317,33 @@ class Program
         await EditOrSendMessage(chatId, user, text, keyboard, ct);
     }
 
-    // Конвертер
+    // Конвертер с русскими названиями кнопок
     static async Task EditConvertFromMenu(long chatId, UserState user, CancellationToken ct)
     {
-        var cur = new[] { "RUB", "KZT", "USD", "EUR", "GBP", "CNY", "AED", "TRY", "UAH", "KGS", "UZS" };
+        var currencies = new[] { "RUB", "KZT", "USD", "EUR", "GBP", "CNY", "AED", "TRY", "UAH", "KGS", "UZS" };
         var buttons = new List<InlineKeyboardButton[]>();
-        for (int i = 0; i < cur.Length; i += 3)
-            buttons.Add(cur.Skip(i).Take(3).Select(c => InlineKeyboardButton.WithCallbackData(c, $"convfrom_{c}")).ToArray());
+        for (int i = 0; i < currencies.Length; i += 3)
+        {
+            var row = currencies.Skip(i).Take(3).Select(code =>
+                InlineKeyboardButton.WithCallbackData(CurrencyName(code), $"convfrom_{code}")).ToArray();
+            buttons.Add(row);
+        }
         buttons.Add(new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") });
         await EditOrSendMessage(chatId, user, "💱 Выберите исходную валюту:", new InlineKeyboardMarkup(buttons), ct);
     }
 
     static async Task EditConvertToMenu(long chatId, UserState user, CancellationToken ct)
     {
-        var cur = new[] { "RUB", "KZT", "USD", "EUR", "GBP", "CNY", "AED", "TRY", "UAH", "KGS", "UZS" };
+        var currencies = new[] { "RUB", "KZT", "USD", "EUR", "GBP", "CNY", "AED", "TRY", "UAH", "KGS", "UZS" };
         var buttons = new List<InlineKeyboardButton[]>();
-        for (int i = 0; i < cur.Length; i += 3)
-            buttons.Add(cur.Skip(i).Take(3).Select(c => InlineKeyboardButton.WithCallbackData(c, $"convto_{c}")).ToArray());
+        for (int i = 0; i < currencies.Length; i += 3)
+        {
+            var row = currencies.Skip(i).Take(3).Select(code =>
+                InlineKeyboardButton.WithCallbackData(CurrencyName(code), $"convto_{code}")).ToArray();
+            buttons.Add(row);
+        }
         buttons.Add(new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back") });
-        await EditOrSendMessage(chatId, user, $"💱 {user.ConvertFrom} → ?\nВыберите целевую валюту:", new InlineKeyboardMarkup(buttons), ct);
+        await EditOrSendMessage(chatId, user, $"💱 {CurrencyName(user.ConvertFrom!)} → ?\nВыберите целевую валюту:", new InlineKeyboardMarkup(buttons), ct);
     }
 
     static async Task HandleAmountInput(long chatId, UserState user, string input, CancellationToken ct)
@@ -336,7 +363,7 @@ class Program
                 return;
             }
             var result = amount * rate.Value;
-            var msg = $"🧮 {amount} {user.ConvertFrom} = {result:F2} {user.ConvertTo}";
+            var msg = $"🧮 {amount} {CurrencyName(user.ConvertFrom!)} = {result:F2} {CurrencyName(user.ConvertTo!)}";
             user.ConvertFrom = null;
             user.ConvertTo = null;
             user.WaitingForAmount = false;
@@ -345,7 +372,7 @@ class Program
         catch { await EditOrSendMain(chatId, user, ct, extra: "❌ Ошибка курса."); }
     }
 
-    // Погода с иконками (исправлены типы)
+    // Погода с иконками
     static async Task<(string text, double? temp)> GetWeather(string cityEn, string cityRu)
     {
         try
@@ -361,15 +388,12 @@ class Program
 
             string emoji = iconCode switch
             {
-                "01d" => "☀️",
-                "01n" => "🌙",
-                "02d" => "⛅",
-                "02n" => "🌙",
+                "01d" => "☀️", "01n" => "🌙",
+                "02d" => "⛅", "02n" => "🌙",
                 "03d" or "03n" => "☁",
                 "04d" or "04n" => "☁",
                 "09d" or "09n" => "🌧",
-                "10d" => "🌦",
-                "10n" => "🌧",
+                "10d" => "🌦", "10n" => "🌧",
                 "11d" or "11n" => "⛈",
                 "13d" or "13n" => "🌨",
                 "50d" or "50n" => "🌫",
@@ -424,7 +448,6 @@ class Program
         catch (Exception ex) { return $"❌ Ошибка прогноза: {ex.Message}"; }
     }
 
-    // Остальное (новости, курсы, часовые пояса, инлайн, рассылка, редактирование) без изменений с корректными nullable
     static async Task<string> GetNews(string cityRu)
     {
         try
