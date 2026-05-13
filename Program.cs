@@ -250,10 +250,10 @@ class Program
                 break;
 
             case "city_almetyevsk": SetCity(user, "Almetyevsk", "Альметьевск"); await EditMainMenu(chatId, user, ct); break;
-            case "city_shymkent": SetCity(user, "Shymkent", "Шымкент"); await EditMainMenu(chatId, user, ct); break;
-            case "city_moscow": SetCity(user, "Moscow", "Москва"); await EditMainMenu(chatId, user, ct); break;
-            case "city_almaty": SetCity(user, "Almaty", "Алматы"); await EditMainMenu(chatId, user, ct); break;
-            case "city_astana": SetCity(user, "Astana", "Астана"); await EditMainMenu(chatId, user, ct); break;
+            case "city_shymkent":   SetCity(user, "Shymkent", "Шымкент");     await EditMainMenu(chatId, user, ct); break;
+            case "city_moscow":     SetCity(user, "Moscow", "Москва");         await EditMainMenu(chatId, user, ct); break;
+            case "city_almaty":     SetCity(user, "Almaty", "Алматы");         await EditMainMenu(chatId, user, ct); break;
+            case "city_astana":     SetCity(user, "Astana", "Астана");         await EditMainMenu(chatId, user, ct); break;
 
             case "city_custom":
                 user.WaitingForCustomCity = true;
@@ -296,7 +296,7 @@ class Program
 
     static string CurrencyName(string code) => CurrencyNames.TryGetValue(code, out var name) ? name : code;
     static void SetCity(UserState user, string en, string ru) { user.CityEn = en; user.CityRu = ru; }
-    static string Loc(string ru, UserState u) => u.UseKazakh ? ru.Replace("Погода", "Ауа райы").Replace("Новости", "Жаңалықтар") : ru; // очень упрощённая локализация
+    static string Loc(string ru, UserState u) => u.UseKazakh ? ru.Replace("Погода", "Ауа райы").Replace("Новости", "Жаңалықтар") : ru;
 
     // ==================== ГЛАВНОЕ МЕНЮ ====================
     static async Task EditMainMenu(long chatId, UserState user, CancellationToken ct)
@@ -328,13 +328,11 @@ class Program
             new[] { InlineKeyboardButton.WithCallbackData("📍 Карта", "map"), InlineKeyboardButton.WithCallbackData("❓ Помощь", "help") },
         };
 
-        // Избранные города
         if (user.Favorites.Count > 0)
         {
             var favRow = user.Favorites.Select(f => InlineKeyboardButton.WithCallbackData(f, $"fav_{f}")).ToArray();
             rows.Insert(0, favRow);
         }
-        // Кнопка избранного / языка
         var utilRow = new List<InlineKeyboardButton>
         {
             user.Favorites.Contains(user.CityEn)
@@ -343,9 +341,6 @@ class Program
         };
         utilRow.Add(InlineKeyboardButton.WithCallbackData(user.UseKazakh ? "🇷🇺 Русский" : "🇰🇿 Қазақша", "lang"));
         rows.Add(utilRow.ToArray());
-
-        // WebApp кнопка
-        rows.Add(new[] { InlineKeyboardButton.WithWebApp("📊 Графики", new WebAppInfo { Url = "https://your-webapp-url.com" }) });
 
         var keyboard = new InlineKeyboardMarkup(rows);
         await EditOrSendMessage(chatId, user, text, keyboard, ct);
@@ -508,15 +503,12 @@ class Program
 
             string emoji = iconCode switch
             {
-                "01d" => "☀️",
-                "01n" => "🌙",
-                "02d" => "⛅",
-                "02n" => "🌙",
+                "01d" => "☀️", "01n" => "🌙",
+                "02d" => "⛅", "02n" => "🌙",
                 "03d" or "03n" => "☁",
                 "04d" or "04n" => "☁",
                 "09d" or "09n" => "🌧",
-                "10d" => "🌦",
-                "10n" => "🌧",
+                "10d" => "🌦", "10n" => "🌧",
                 "11d" or "11n" => "⛈",
                 "13d" or "13n" => "🌨",
                 "50d" or "50n" => "🌫",
@@ -610,8 +602,8 @@ class Program
             return "<pre>" +
                    "Валюта      │ USD        │ RUB        \n" +
                    "────────────┼────────────┼────────────\n" +
-                   $"🇷🇺 RUB      │ {1 / rub,10:F4} │     1.0000\n" +
-                   $"🇰🇿 KZT      │ {1 / kzt,10:F4} │ {Safe(1, rub / kzt),10:F4}\n" +
+                   $"🇷🇺 RUB      │ {1/rub,10:F4} │     1.0000\n" +
+                   $"🇰🇿 KZT      │ {1/kzt,10:F4} │ {Safe(1, rub/kzt),10:F4}\n" +
                    $"🇺🇸 USD      │     1.0000 │ {rub,10:F2}\n" +
                    $"🇪🇺 EUR      │ {eur,10:F4} │ {Safe(rub, eur),10:F2}\n" +
                    $"🇬🇧 GBP      │ {gbp,10:F4} │ {Safe(rub, gbp),10:F2}\n" +
