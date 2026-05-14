@@ -400,7 +400,7 @@ class Program
         var keyboard = new InlineKeyboardMarkup(new[] {
             new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back"), InlineKeyboardButton.WithCallbackData("🔄 Обновить", "rates") }
         });
-        await EditOrSendMessage(chatId, user, rates, keyboard, ct, parseMode: ParseMode.HTML);
+        await EditOrSendMessage(chatId, user, rates, keyboard, ct, parseMode: ParseMode.Html);
     }
 
     // Редактирование сообщений
