@@ -3,7 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO; // <-- добавлено
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -81,6 +81,7 @@ class Program
         Console.WriteLine($"Бот @{me.Username} запущен!");
 
         _ = Task.Run(() => DailyNotifyLoop(cts.Token), cts.Token);
+        _ = Task.Run(() => DangerousWeatherLoop(cts.Token), cts.Token); // <-- ДОБАВЛЕНО
 
         await Task.Delay(Timeout.Infinite, cts.Token);
     }
@@ -610,6 +611,79 @@ class Program
         }
     }
 
+    // НОВЫЙ МЕТОД ДЛЯ ЭКСТРЕННЫХ УВЕДОМЛЕНИЙ
+    static async Task DangerousWeatherLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var now = DateTime.UtcNow;
+            foreach (var kv in subscribers)
+            {
+                var chatId = kv.Key;
+                if (!users.TryGetValue(chatId, out var user)) continue;
+                var tz = GetTimeZone(user.CityEn);
+                var localNow = TimeZoneInfo.ConvertTimeFromUtc(now, tz);
+
+                // не чаще раза в день
+                if (localNow.Date == user.LastNotifyDate) continue;
+
+                string? warning = null;
+                try
+                {
+                    var fcUrl = $"https://api.openweathermap.org/data/2.5/forecast?q={user.CityEn}&appid={WEATHER_KEY}&units=metric&lang=ru";
+                    var fcJson = JObject.Parse(await http.GetStringAsync(fcUrl));
+                    var todayItems = (fcJson["list"] as JArray)
+                        ?.Where(i => i["dt_txt"]!.ToString().StartsWith(localNow.ToString("yyyy-MM-dd")))
+                        .ToList();
+
+                    if (todayItems != null && todayItems.Any())
+                    {
+                        double maxWind = todayItems.Max(i => i["wind"]!["speed"]!.Value<double>());
+                        var weatherConditions = todayItems
+                            .SelectMany(i => i["weather"]!)
+                            .Select(w => new
+                            {
+                                Main = w["main"]!.ToString(),
+                                Description = w["description"]!.ToString(),
+                                Id = w["id"]!.Value<int>()
+                            })
+                            .ToList();
+
+                        bool hasThunderstorm = weatherConditions.Any(w => w.Main == "Thunderstorm");
+                        bool hasHeavyRain = weatherConditions.Any(w => w.Id >= 502 && w.Main == "Rain");
+                        bool hasSnow = weatherConditions.Any(w => w.Id >= 602 && w.Main == "Snow");
+                        bool hasHail = weatherConditions.Any(w => w.Id == 906);
+
+                        var warnings = new List<string>();
+                        if (maxWind > 15) warnings.Add($"🌬 Сильный ветер до {maxWind:F0} м/с");
+                        if (hasThunderstorm) warnings.Add("⛈ Ожидается гроза");
+                        if (hasHeavyRain) warnings.Add("🌧 Сильный дождь (ливень)");
+                        if (hasSnow) warnings.Add("❄️ Сильный снегопад");
+                        if (hasHail) warnings.Add("🌨 Возможен град");
+
+                        if (warnings.Any())
+                            warning = "⚠️ *Экстренное предупреждение!*\n\n" +
+                                      $"В городе {user.CityRu} сегодня ожидается:\n" +
+                                      string.Join("\n", warnings.Select(w => $"• {w}")) +
+                                      "\n\nБудьте осторожны!";
+                    }
+                }
+                catch { }
+
+                if (warning != null)
+                {
+                    try
+                    {
+                        await bot.SendMessage(chatId, warning, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                        user.LastNotifyDate = localNow.Date; // чтобы не слать повторно
+                    }
+                    catch { }
+                }
+            }
+            await Task.Delay(TimeSpan.FromMinutes(30), ct);
+        }
+    }
+
     static async Task EditToday(long chatId, UserState user, CancellationToken ct)
     {
         try
@@ -793,7 +867,7 @@ class Database
 
     public void Initialize()
     {
-        Directory.CreateDirectory("/data"); // создаём папку, если её нет
+        Directory.CreateDirectory("/data");
         using var con = new SqliteConnection(connectionString);
         con.Open();
         var cmd = con.CreateCommand();
