@@ -793,6 +793,7 @@ class Database
 
     public void Initialize()
     {
+        Directory.CreateDirectory("/data"); // создаём папку, если нет
         using var con = new SqliteConnection(connectionString);
         con.Open();
         var cmd = con.CreateCommand();
