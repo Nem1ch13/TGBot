@@ -48,29 +48,6 @@ class Program
     static readonly string[] WorldCitiesEn = { "London", "Tokyo", "Berlin", "Paris", "Rome", "Madrid", "Beijing", "Sydney", "New York", "Toronto", "Seoul", "Bangkok", "Dubai", "Singapore", "Mumbai" };
     static readonly Random rng = new();
 
-    class UserState
-    {
-        public string CityEn = "Almetyevsk";
-        public string CityRu = "Альметьевск";
-        public bool WaitingForCustomCity;
-        public bool Subscribed;
-        public int MainMessageId;
-        public bool FirstRun = true;
-
-        public string? ConvertFrom;
-        public string? ConvertTo;
-        public bool WaitingForAmount;
-
-        public int RequestCount;
-        public double? LastTemp;
-        public DateTime LastTempDate;
-
-        public List<string> Favorites = new();
-        public List<string> ConversionHistory = new();
-        public string? RemindTime;
-        public DateTime LastNotifyDate;
-    }
-
     static ConcurrentDictionary<long, UserState> users = new();
     static ConcurrentDictionary<long, int> subscribers = new();
 
@@ -107,7 +84,6 @@ class Program
         await Task.Delay(Timeout.Infinite, cts.Token);
     }
 
-    // ==================== ОБРАБОТКА ОБНОВЛЕНИЙ ====================
     static async Task HandleUpdate(ITelegramBotClient botClient, Update update, CancellationToken ct)
     {
         if (update.InlineQuery != null) { await HandleInlineQuery(botClient, update.InlineQuery, ct); return; }
@@ -248,7 +224,6 @@ class Program
     static string CurrencyName(string code) => CurrencyNames.TryGetValue(code, out var name) ? name : code;
     static void SetCity(UserState user, string en, string ru, long chatId) { user.CityEn = en; user.CityRu = ru; db.SaveUser(chatId, user); }
 
-    // ==================== ГЛАВНОЕ МЕНЮ ====================
     static async Task EditMainMenu(long chatId, UserState user, CancellationToken ct)
     {
         var (weatherText, temp) = await GetWeather(user.CityEn, user.CityRu);
@@ -301,14 +276,12 @@ class Program
         };
         rows.Add(utilRow.ToArray());
 
-        // Кнопка WebApp с графиком
         var webAppUrl = $"https://nem1ch13.github.io/TGBot/webapp?city={Uri.EscapeDataString(user.CityEn)}";
         rows.Add(new[] { InlineKeyboardButton.WithWebApp("📊 Графики", new WebAppInfo { Url = webAppUrl }) });
 
         await EditOrSendMessage(chatId, user, text, new InlineKeyboardMarkup(rows), ct);
     }
 
-    // ==================== ВОСХОД/ЗАКАТ ====================
     static async Task<(string sunrise, string sunset)> GetSunriseSunset(string cityEn)
     {
         try
@@ -324,7 +297,6 @@ class Program
         catch { return ("", ""); }
     }
 
-    // ==================== ПОДЕЛИТЬСЯ ====================
     static async Task ShareWeather(long chatId, UserState user, CancellationToken ct)
     {
         var (weatherText, _) = await GetWeather(user.CityEn, user.CityRu);
@@ -333,7 +305,6 @@ class Program
         await bot.SendMessage(chatId, shareText, cancellationToken: ct);
     }
 
-    // ==================== ПОЧАСОВОЙ ПРОГНОЗ ====================
     static async Task EditHourly(long chatId, UserState user, CancellationToken ct)
     {
         try
@@ -372,7 +343,6 @@ class Program
         _ => "🌡"
     };
 
-    // ==================== ПРОГНОЗ НА 5 ДНЕЙ ====================
     static async Task EditForecast(long chatId, UserState user, CancellationToken ct)
     {
         var forecast = await GetForecast(user.CityEn, user.CityRu);
@@ -418,7 +388,6 @@ class Program
         catch (Exception ex) { return $"❌ Ошибка прогноза: {ex.Message}"; }
     }
 
-    // ==================== НОВОСТИ ====================
     static async Task EditNews(long chatId, UserState user, CancellationToken ct)
     {
         var news = await GetNews(user.CityRu);
@@ -454,7 +423,6 @@ class Program
         catch (Exception ex) { return $"❌ Ошибка новостей: {ex.Message}"; }
     }
 
-    // ==================== КУРСЫ (ТАБЛИЦА HTML) ====================
     static async Task<string> GetRates()
     {
         try
@@ -496,7 +464,6 @@ class Program
         await EditOrSendMessage(chatId, user, rates, keyboard, ct, parseMode: ParseMode.Html);
     }
 
-    // ==================== РЕДАКТИРОВАНИЕ СООБЩЕНИЙ ====================
     static async Task EditOrSendMessage(long chatId, UserState user, string text, InlineKeyboardMarkup keyboard, CancellationToken ct, ParseMode parseMode = ParseMode.Markdown)
     {
         if (user.MainMessageId != 0)
@@ -522,7 +489,6 @@ class Program
         await EditOrSendMessage(chatId, user, text, keyboard, ct);
     }
 
-    // ==================== ПОГОДА ====================
     static async Task<(string text, double? temp)> GetWeather(string cityEn, string cityRu, bool useMarkdown = true)
     {
         try
@@ -571,7 +537,6 @@ class Program
         catch { return (false, ""); }
     }
 
-    // ==================== ПРОГНОЗ НА СЕГОДНЯ ====================
     static async Task<string> GetTodayForecast(string cityEn, string cityRu)
     {
         try
@@ -599,7 +564,6 @@ class Program
         catch { return ""; }
     }
 
-    // ==================== РАССЫЛКА С ПРЕДУПРЕЖДЕНИЯМИ ====================
     static async Task DailyNotifyLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -645,7 +609,6 @@ class Program
         }
     }
 
-    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
     static async Task EditToday(long chatId, UserState user, CancellationToken ct)
     {
         try
@@ -705,7 +668,6 @@ class Program
         await EditOrSendMessage(chatId, user, text, keyboard, ct);
     }
 
-    // ==================== КОНВЕРТЕР ====================
     static async Task EditConvertFromMenu(long chatId, UserState user, CancellationToken ct)
     {
         var currencies = new[] { "RUB", "KZT", "USD", "EUR", "GBP", "PLN", "CNY", "AED", "TRY", "UAH", "KGS", "UZS" };
@@ -755,7 +717,6 @@ class Program
         catch { await EditOrSendMain(chatId, user, ct, extra: "❌ Ошибка курса."); }
     }
 
-    // ==================== ВРЕМЯ И ТАЙМЗОНЫ ====================
     static TimeZoneInfo GetTimeZone(string cityEn)
     {
         string id = cityEn switch
@@ -776,7 +737,6 @@ class Program
         return $"🕐 {local:HH:mm} | 📅 {local:dd.MM.yyyy}";
     }
 
-    // ==================== ИНЛАЙН ====================
     static async Task HandleInlineQuery(ITelegramBotClient botClient, InlineQuery query, CancellationToken ct)
     {
         var search = query.Query?.Trim();
@@ -788,7 +748,6 @@ class Program
         await botClient.AnswerInlineQuery(query.Id, new[] { result }, cacheTime: 10, cancellationToken: ct);
     }
 
-    // ==================== АНИМАЦИЯ И ОШИБКИ ====================
     static async Task AnimateLoading(long chatId, UserState user, CancellationToken ct, Func<Task> action)
     {
         if (user.MainMessageId != 0)
@@ -803,7 +762,31 @@ class Program
     }
 }
 
-// ==================== БАЗА ДАННЫХ ====================
+// ==================== КЛАССЫ ВНЕ Program ====================
+
+class UserState
+{
+    public string CityEn = "Almetyevsk";
+    public string CityRu = "Альметьевск";
+    public bool WaitingForCustomCity;
+    public bool Subscribed;
+    public int MainMessageId;
+    public bool FirstRun = true;
+
+    public string? ConvertFrom;
+    public string? ConvertTo;
+    public bool WaitingForAmount;
+
+    public int RequestCount;
+    public double? LastTemp;
+    public DateTime LastTempDate;
+
+    public List<string> Favorites = new();
+    public List<string> ConversionHistory = new();
+    public string? RemindTime;
+    public DateTime LastNotifyDate;
+}
+
 class Database
 {
     readonly string connectionString = "Data Source=/data/bot.db";
