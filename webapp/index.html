@@ -3,24 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Погода</title>
+    <title>График погоды</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 16px; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+        body { font-family: -apple-system, sans-serif; margin: 16px; }
         canvas { max-width: 100%; margin-top: 20px; }
-        .city-title { font-size: 20px; font-weight: bold; margin-bottom: 8px; }
     </style>
 </head>
 <body>
-    <div class="city-title" id="cityName">Загрузка...</div>
+    <h2 id="cityName">Загрузка...</h2>
     <canvas id="tempChart"></canvas>
-
     <script>
-        const WEATHER_KEY = 'b87ebb55d538c2d9213edfad793e6bef'; // замени на свой (или лучше получать из переменных окружения, но в статике нельзя)
+        const WEATHER_KEY = 'твой_ключ_сюда'; // обязательно замени на свой ключ OpenWeatherMap
         const params = new URLSearchParams(window.location.search);
         const city = params.get('city') || 'Almetyevsk';
         document.getElementById('cityName').textContent = `Прогноз для ${city}`;
-
         async function fetchForecast() {
             const url = `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`;
             const res = await fetch(url);
@@ -29,40 +26,27 @@
             data.list.forEach(item => {
                 const date = item.dt_txt.split(' ')[0];
                 const temp = item.main.temp;
-                if (!daily[date]) daily[date] = { min: temp, max: temp, desc: item.weather[0].description };
+                if (!daily[date]) daily[date] = { min: temp, max: temp };
                 else {
                     if (temp < daily[date].min) daily[date].min = temp;
                     if (temp > daily[date].max) daily[date].max = temp;
                 }
             });
             const labels = Object.keys(daily).slice(0, 5);
-            const minTemps = labels.map(d => daily[d].min);
-            const maxTemps = labels.map(d => daily[d].max);
-
-            const ctx = document.getElementById('tempChart').getContext('2d');
-            new Chart(ctx, {
+            const min = labels.map(d => daily[d].min);
+            const max = labels.map(d => daily[d].max);
+            new Chart(document.getElementById('tempChart'), {
                 type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
-                        { label: 'Мин. температура', data: minTemps, borderColor: '#36a2eb', fill: false },
-                        { label: 'Макс. температура', data: maxTemps, borderColor: '#ff6384', fill: false }
+                        { label: 'Мин.', data: min, borderColor: '#36a2eb' },
+                        { label: 'Макс.', data: max, borderColor: '#ff6384' }
                     ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'bottom' }
-                    },
-                    scales: {
-                        y: { title: { display: true, text: '°C' } }
-                    }
                 }
             });
         }
-        fetchForecast().catch(e => {
-            document.getElementById('cityName').textContent = 'Ошибка загрузки данных';
-        });
+        fetchForecast();
     </script>
 </body>
 </html>
