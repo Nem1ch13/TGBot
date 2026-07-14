@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Data.Sqlite;
 
 class Program
 {
@@ -26,8 +27,8 @@ class Program
 
     static TelegramBotClient bot = null!;
     static HttpClient http = new HttpClient();
+    static Database db = null!;
 
-    // Названия валют (добавлен злотый)
     static readonly Dictionary<string, string> CurrencyNames = new()
     {
         ["RUB"] = "🇷🇺 Рубль",
@@ -62,6 +63,7 @@ class Program
 
         public int RequestCount;
         public double? LastTemp;
+        public DateTime LastTempDate;
 
         public List<string> Favorites = new();
         public List<string> ConversionHistory = new();
@@ -74,6 +76,9 @@ class Program
 
     static async Task Main()
     {
+        db = new Database();
+        db.Initialize();
+
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         var host = Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(webBuilder =>
@@ -112,7 +117,7 @@ class Program
 
         var chatId = update.Message.Chat.Id;
         var text = update.Message.Text.Trim();
-        var user = users.GetOrAdd(chatId, _ => new UserState());
+        var user = users.GetOrAdd(chatId, _ => db.LoadUser(chatId) ?? new UserState());
         user.RequestCount++;
         try { await bot.DeleteMessage(chatId, update.Message.MessageId, ct); } catch { }
 
@@ -122,6 +127,7 @@ class Program
             if (parts.Length == 2 && TimeSpan.TryParse(parts[1], out var ts))
             {
                 user.RemindTime = ts.ToString(@"hh\:mm");
+                db.SaveUser(chatId, user);
                 await EditOrSendMain(chatId, user, ct, extra: "⏰ Напоминание установлено на " + user.RemindTime);
             }
             else await EditOrSendMain(chatId, user, ct, extra: "Формат: /remind 08:00");
@@ -140,6 +146,7 @@ class Program
             var (ok, _) = await TryGetWeather(text);
             if (!ok) { await EditOrSendMain(chatId, user, ct, extra: $"❌ Город \"{text}\" не найден."); return; }
             user.CityEn = text; user.CityRu = text;
+            db.SaveUser(chatId, user);
             await EditMainMenu(chatId, user, ct);
             return;
         }
@@ -161,7 +168,7 @@ class Program
             var geoUrl = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={WEATHER_KEY}&units=metric&lang=ru";
             var json = JObject.Parse(await http.GetStringAsync(geoUrl));
             var city = json["name"]?.ToString();
-            if (!string.IsNullOrEmpty(city)) { user.CityEn = city; user.CityRu = city; await EditMainMenu(msg.Chat.Id, user, ct); }
+            if (!string.IsNullOrEmpty(city)) { user.CityEn = city; user.CityRu = city; db.SaveUser(msg.Chat.Id, user); await EditMainMenu(msg.Chat.Id, user, ct); }
             else await EditOrSendMain(msg.Chat.Id, user, ct, extra: "❌ Не удалось определить город.");
         }
         catch { await EditOrSendMain(msg.Chat.Id, user, ct, extra: "❌ Ошибка геолокации."); }
@@ -187,23 +194,26 @@ class Program
             case "map": await EditMapLink(chatId, user, ct); break;
             case "subscribe":
                 user.Subscribed = !user.Subscribed;
+                db.SaveUser(chatId, user);
                 if (user.Subscribed) subscribers[chatId] = GetUtcOffset(user.CityEn);
                 else subscribers.TryRemove(chatId, out _);
                 await EditMainMenu(chatId, user, ct);
                 break;
             case "favorite":
-                if (!user.Favorites.Contains(user.CityEn)) { user.Favorites.Add(user.CityEn); if (user.Favorites.Count > 3) user.Favorites.RemoveAt(0); }
+                if (!user.Favorites.Contains(user.CityEn)) { user.Favorites.Add(user.CityEn); if (user.Favorites.Count > 3) user.Favorites.RemoveAt(0); db.SaveFavorites(chatId, user.Favorites); }
                 await EditMainMenu(chatId, user, ct);
                 break;
-            case "unfavorite": user.Favorites.Remove(user.CityEn); await EditMainMenu(chatId, user, ct); break;
+            case "unfavorite": user.Favorites.Remove(user.CityEn); db.SaveFavorites(chatId, user.Favorites); await EditMainMenu(chatId, user, ct); break;
             case "today": await AnimateLoading(chatId, user, ct, async () => await EditToday(chatId, user, ct)); break;
+            case "hourly": await AnimateLoading(chatId, user, ct, async () => await EditHourly(chatId, user, ct)); break;
             case "history": await EditHistory(chatId, user, ct); break;
+            case "share": await ShareWeather(chatId, user, ct); break;
 
-            case "city_almetyevsk": SetCity(user, "Almetyevsk", "Альметьевск"); await EditMainMenu(chatId, user, ct); break;
-            case "city_shymkent":   SetCity(user, "Shymkent", "Шымкент");     await EditMainMenu(chatId, user, ct); break;
-            case "city_moscow":     SetCity(user, "Moscow", "Москва");         await EditMainMenu(chatId, user, ct); break;
-            case "city_almaty":     SetCity(user, "Almaty", "Алматы");         await EditMainMenu(chatId, user, ct); break;
-            case "city_astana":     SetCity(user, "Astana", "Астана");         await EditMainMenu(chatId, user, ct); break;
+            case "city_almetyevsk": SetCity(user, "Almetyevsk", "Альметьевск", chatId); await EditMainMenu(chatId, user, ct); break;
+            case "city_shymkent":   SetCity(user, "Shymkent", "Шымкент", chatId);     await EditMainMenu(chatId, user, ct); break;
+            case "city_moscow":     SetCity(user, "Moscow", "Москва", chatId);         await EditMainMenu(chatId, user, ct); break;
+            case "city_almaty":     SetCity(user, "Almaty", "Алматы", chatId);         await EditMainMenu(chatId, user, ct); break;
+            case "city_astana":     SetCity(user, "Astana", "Астана", chatId);         await EditMainMenu(chatId, user, ct); break;
             case "city_custom":
                 user.WaitingForCustomCity = true;
                 await EditOrSendMain(chatId, user, ct, extra: "✏️ Введите название города на английском:",
@@ -211,7 +221,7 @@ class Program
                 break;
             case "city_random":
                 var randomCity = WorldCitiesEn[rng.Next(WorldCitiesEn.Length)];
-                SetCity(user, randomCity, randomCity);
+                SetCity(user, randomCity, randomCity, chatId);
                 await EditMainMenu(chatId, user, ct);
                 break;
             case "choose_city": await EditCityMenu(chatId, user, ct); break;
@@ -229,20 +239,22 @@ class Program
                 break;
             case string s when s.StartsWith("fav_"):
                 var favCity = s[4..];
-                SetCity(user, favCity, favCity);
+                SetCity(user, favCity, favCity, chatId);
                 await EditMainMenu(chatId, user, ct);
                 break;
         }
     }
 
     static string CurrencyName(string code) => CurrencyNames.TryGetValue(code, out var name) ? name : code;
-    static void SetCity(UserState user, string en, string ru) { user.CityEn = en; user.CityRu = ru; }
+    static void SetCity(UserState user, string en, string ru, long chatId) { user.CityEn = en; user.CityRu = ru; db.SaveUser(chatId, user); }
 
     // ==================== ГЛАВНОЕ МЕНЮ ====================
     static async Task EditMainMenu(long chatId, UserState user, CancellationToken ct)
     {
         var (weatherText, temp) = await GetWeather(user.CityEn, user.CityRu);
+        var (sunrise, sunset) = await GetSunriseSunset(user.CityEn);
         var timeStr = GetLocalTimeString(user.CityEn, user.CityRu);
+
         string greeting = "";
         if (user.FirstRun) { greeting = "👋 Добро пожаловать, брат!\n\n"; user.FirstRun = false; }
 
@@ -252,12 +264,20 @@ class Program
             double t = temp.Value;
             if (t <= -10) tempHint = "\n🥶 Очень холодно!";
             else if (t >= 30) tempHint = "\n🥵 Жарко!";
-            if (user.LastTemp.HasValue && Math.Abs(t - user.LastTemp.Value) >= 15)
-                tempHint += $"\n⚠️ Резкий перепад температуры ({Math.Abs(t - user.LastTemp.Value):F0}°C)!";
+            if (user.LastTempDate.Date == DateTime.Now.AddDays(-1).Date && user.LastTemp.HasValue)
+            {
+                var diff = t - user.LastTemp.Value;
+                if (Math.Abs(diff) >= 5)
+                    tempHint += $"\n📈 По сравнению со вчерашним днём: {diff:+0;-0}F0°C";
+            }
             user.LastTemp = t;
+            user.LastTempDate = DateTime.Now;
+            db.SaveUser(chatId, user);
         }
 
-        var text = $"{greeting}🏙 *{user.CityRu}*\n{timeStr}\n\n{weatherText}{tempHint}\n\nВыберите действие:";
+        var sunriseLine = sunrise != "" ? $"\n🌅 Восход: {sunrise}   🌇 Закат: {sunset}" : "";
+
+        var text = $"{greeting}🏙 *{user.CityRu}*\n{timeStr}{sunriseLine}\n\n{weatherText}{tempHint}\n\nВыберите действие:";
 
         var rows = new List<InlineKeyboardButton[]>
         {
@@ -265,6 +285,7 @@ class Program
             new[] { InlineKeyboardButton.WithCallbackData("💵 Курсы", "rates"), InlineKeyboardButton.WithCallbackData("🧮 Конвертер", "convert") },
             new[] { InlineKeyboardButton.WithCallbackData("🌍 Город", "choose_city"), InlineKeyboardButton.WithCallbackData(user.Subscribed ? "🔕 Отписаться" : "🔔 Подписаться", "subscribe") },
             new[] { InlineKeyboardButton.WithCallbackData("📍 Карта", "map"), InlineKeyboardButton.WithCallbackData("❓ Помощь", "help") },
+            new[] { InlineKeyboardButton.WithCallbackData("📤 Поделиться", "share") },
         };
 
         if (user.Favorites.Count > 0)
@@ -280,15 +301,83 @@ class Program
         };
         rows.Add(utilRow.ToArray());
 
+        // Кнопка WebApp с графиком
+        var webAppUrl = $"https://nem1ch13.github.io/TGBot/webapp?city={Uri.EscapeDataString(user.CityEn)}";
+        rows.Add(new[] { InlineKeyboardButton.WithWebApp("📊 Графики", new WebAppInfo { Url = webAppUrl }) });
+
         await EditOrSendMessage(chatId, user, text, new InlineKeyboardMarkup(rows), ct);
     }
 
-    // ==================== ПРОГНОЗ ====================
+    // ==================== ВОСХОД/ЗАКАТ ====================
+    static async Task<(string sunrise, string sunset)> GetSunriseSunset(string cityEn)
+    {
+        try
+        {
+            var url = $"https://api.openweathermap.org/data/2.5/weather?q={cityEn}&appid={WEATHER_KEY}&units=metric&lang=ru";
+            var json = JObject.Parse(await http.GetStringAsync(url));
+            var sys = json["sys"];
+            if (sys == null) return ("", "");
+            var sunrise = DateTimeOffset.FromUnixTimeSeconds(sys["sunrise"]!.Value<long>()).DateTime.ToLocalTime();
+            var sunset = DateTimeOffset.FromUnixTimeSeconds(sys["sunset"]!.Value<long>()).DateTime.ToLocalTime();
+            return (sunrise.ToString("HH:mm"), sunset.ToString("HH:mm"));
+        }
+        catch { return ("", ""); }
+    }
+
+    // ==================== ПОДЕЛИТЬСЯ ====================
+    static async Task ShareWeather(long chatId, UserState user, CancellationToken ct)
+    {
+        var (weatherText, _) = await GetWeather(user.CityEn, user.CityRu);
+        var timeStr = GetLocalTimeString(user.CityEn, user.CityRu);
+        var shareText = $"Погода в {user.CityRu} сейчас:\n{timeStr}\n{weatherText}\n\nОтправлено из бота @Tgvstestbot";
+        await bot.SendMessage(chatId, shareText, cancellationToken: ct);
+    }
+
+    // ==================== ПОЧАСОВОЙ ПРОГНОЗ ====================
+    static async Task EditHourly(long chatId, UserState user, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"https://api.openweathermap.org/data/2.5/forecast?q={user.CityEn}&appid={WEATHER_KEY}&units=metric&lang=ru";
+            var json = JObject.Parse(await http.GetStringAsync(url));
+            var list = json["list"] as JArray;
+            var result = $"🕒 Почасовой прогноз для {user.CityRu}:\n\n";
+            for (int i = 0; i < 8 && i < list!.Count; i++)
+            {
+                var item = list[i];
+                var time = DateTime.Parse(item["dt_txt"]!.ToString()).ToString("HH:mm");
+                var temp = item["main"]!["temp"]!.Value<double>();
+                var desc = item["weather"]![0]!["description"]!.ToString();
+                var icon = item["weather"]![0]!["icon"]!.ToString();
+                var emoji = GetWeatherEmoji(icon);
+                result += $"{time} {emoji} {temp:F0}°C, {desc}\n";
+            }
+            var keyboard = new InlineKeyboardMarkup(new[] { new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "forecast") } });
+            await EditOrSendMessage(chatId, user, result, keyboard, ct);
+        }
+        catch { await EditOrSendMessage(chatId, user, "❌ Ошибка загрузки почасового прогноза.", null!, ct); }
+    }
+
+    static string GetWeatherEmoji(string code) => code switch
+    {
+        "01d" => "☀️", "01n" => "🌙",
+        "02d" => "⛅", "02n" => "🌙",
+        "03d" or "03n" => "☁",
+        "04d" or "04n" => "☁",
+        "09d" or "09n" => "🌧",
+        "10d" => "🌦", "10n" => "🌧",
+        "11d" or "11n" => "⛈",
+        "13d" or "13n" => "🌨",
+        "50d" or "50n" => "🌫",
+        _ => "🌡"
+    };
+
+    // ==================== ПРОГНОЗ НА 5 ДНЕЙ ====================
     static async Task EditForecast(long chatId, UserState user, CancellationToken ct)
     {
         var forecast = await GetForecast(user.CityEn, user.CityRu);
         var keyboard = new InlineKeyboardMarkup(new[] {
-            new[] { InlineKeyboardButton.WithCallbackData("🌤 Сегодня", "today") },
+            new[] { InlineKeyboardButton.WithCallbackData("🌤 Сегодня", "today"), InlineKeyboardButton.WithCallbackData("🕒 По часам", "hourly") },
             new[] { InlineKeyboardButton.WithCallbackData("◀️ Назад", "back"), InlineKeyboardButton.WithCallbackData("🔄 Обновить", "forecast") }
         });
         await EditOrSendMessage(chatId, user, forecast, keyboard, ct);
@@ -482,7 +571,7 @@ class Program
         catch { return (false, ""); }
     }
 
-    // ==================== ПРОГНОЗ НА СЕГОДНЯ (МИН/МАКС) ====================
+    // ==================== ПРОГНОЗ НА СЕГОДНЯ ====================
     static async Task<string> GetTodayForecast(string cityEn, string cityRu)
     {
         try
@@ -510,7 +599,7 @@ class Program
         catch { return ""; }
     }
 
-    // ==================== УТРЕННЯЯ РАССЫЛКА ====================
+    // ==================== РАССЫЛКА С ПРЕДУПРЕЖДЕНИЯМИ ====================
     static async Task DailyNotifyLoop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -526,17 +615,29 @@ class Program
                 if (localNow.ToString("HH:mm") == targetTime && localNow.Date != user.LastNotifyDate)
                 {
                     user.LastNotifyDate = localNow.Date;
-
-                    // Текущая погода без маркдауна
                     var (currentWeather, _) = await GetWeather(user.CityEn, user.CityRu, useMarkdown: false);
-
-                    // Прогноз на сегодня
                     var todayForecast = await GetTodayForecast(user.CityEn, user.CityRu);
+
+                    string warning = "";
+                    try
+                    {
+                        var fcUrl = $"https://api.openweathermap.org/data/2.5/forecast?q={user.CityEn}&appid={WEATHER_KEY}&units=metric&lang=ru";
+                        var fcJson = JObject.Parse(await http.GetStringAsync(fcUrl));
+                        var todayItems = (fcJson["list"] as JArray)?.Where(i => i["dt_txt"]!.ToString().StartsWith(localNow.ToString("yyyy-MM-dd")));
+                        if (todayItems != null && todayItems.Any())
+                        {
+                            double maxWind = todayItems.Max(i => i["wind"]!["speed"]!.Value<double>());
+                            bool heavyRain = todayItems.Any(i => i["weather"]![0]!["main"]!.ToString() == "Rain" && i["weather"]![0]!["id"]!.Value<int>() >= 502);
+                            if (maxWind > 15) warning += "\n⚠️ Сегодня ожидается сильный ветер!";
+                            if (heavyRain) warning += "\n⚠️ Ожидается сильный дождь!";
+                        }
+                    }
+                    catch { }
 
                     var message = $"🌅 Доброе утро! Погода в {user.CityRu} на {localNow:dd.MM.yyyy}:\n\n" +
                                   $"{currentWeather}\n" +
-                                  $"{todayForecast}";
-
+                                  $"{todayForecast}" +
+                                  $"{warning}";
                     try { await bot.SendMessage(chatId, message, cancellationToken: ct); } catch { }
                 }
             }
@@ -699,5 +800,102 @@ class Program
     {
         Console.WriteLine($"Ошибка: {ex.Message}");
         return Task.CompletedTask;
+    }
+}
+
+// ==================== БАЗА ДАННЫХ ====================
+class Database
+{
+    readonly string connectionString = "Data Source=/data/bot.db";
+
+    public void Initialize()
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Users (
+                ChatId INTEGER PRIMARY KEY,
+                CityEn TEXT,
+                CityRu TEXT,
+                Subscribed INTEGER,
+                RemindTime TEXT,
+                LastTemp REAL,
+                LastTempDate TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Favorites (
+                ChatId INTEGER,
+                CityEn TEXT,
+                PRIMARY KEY (ChatId, CityEn)
+            );
+            CREATE TABLE IF NOT EXISTS ConversionHistory (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ChatId INTEGER,
+                EntryText TEXT,
+                CreatedAt TEXT
+            );
+        ";
+        cmd.ExecuteNonQuery();
+    }
+
+    public UserState? LoadUser(long chatId)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = "SELECT CityEn, CityRu, Subscribed, RemindTime, LastTemp, LastTempDate FROM Users WHERE ChatId = @id";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        using var reader = cmd.ExecuteReader();
+        if (reader.Read())
+        {
+            var st = new UserState
+            {
+                CityEn = reader.GetString(0),
+                CityRu = reader.GetString(1),
+                Subscribed = reader.GetInt32(2) == 1,
+                RemindTime = reader.IsDBNull(3) ? null : reader.GetString(3),
+                LastTemp = reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                LastTempDate = reader.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(reader.GetString(5))
+            };
+            cmd.CommandText = "SELECT CityEn FROM Favorites WHERE ChatId = @id";
+            using var favReader = cmd.ExecuteReader();
+            while (favReader.Read()) st.Favorites.Add(favReader.GetString(0));
+            return st;
+        }
+        return null;
+    }
+
+    public void SaveUser(long chatId, UserState user)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = @"
+            INSERT OR REPLACE INTO Users (ChatId, CityEn, CityRu, Subscribed, RemindTime, LastTemp, LastTempDate)
+            VALUES (@id, @cityEn, @cityRu, @sub, @remind, @temp, @tempDate)";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        cmd.Parameters.AddWithValue("@cityEn", user.CityEn);
+        cmd.Parameters.AddWithValue("@cityRu", user.CityRu);
+        cmd.Parameters.AddWithValue("@sub", user.Subscribed ? 1 : 0);
+        cmd.Parameters.AddWithValue("@remind", (object?)user.RemindTime ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@temp", (object?)user.LastTemp ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@tempDate", user.LastTempDate == DateTime.MinValue ? DBNull.Value : user.LastTempDate.ToString("o"));
+        cmd.ExecuteNonQuery();
+    }
+
+    public void SaveFavorites(long chatId, List<string> favorites)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = "DELETE FROM Favorites WHERE ChatId = @id";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        cmd.ExecuteNonQuery();
+        foreach (var fav in favorites)
+        {
+            cmd.CommandText = "INSERT INTO Favorites (ChatId, CityEn) VALUES (@id, @city)";
+            cmd.Parameters.AddWithValue("@city", fav);
+            cmd.ExecuteNonQuery();
+        }
     }
 }
