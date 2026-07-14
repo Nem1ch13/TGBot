@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO; // <-- добавлено
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -762,8 +763,7 @@ class Program
     }
 }
 
-// ==================== КЛАССЫ ВНЕ Program ====================
-
+// ==================== UserState и Database ====================
 class UserState
 {
     public string CityEn = "Almetyevsk";
@@ -793,7 +793,7 @@ class Database
 
     public void Initialize()
     {
-        Directory.CreateDirectory("/data"); // создаём папку, если нет
+        Directory.CreateDirectory("/data"); // создаём папку, если её нет
         using var con = new SqliteConnection(connectionString);
         con.Open();
         var cmd = con.CreateCommand();
