@@ -233,7 +233,7 @@ class Program
         var timeStr = GetLocalTimeString(user.CityEn, user.CityRu);
 
         string greeting = "";
-        if (user.FirstRun) { greeting = "👋 Добро пожаловать, брат!\n\n"; user.FirstRun = false; }
+        if (user.FirstRun) { greeting = "👋 Добро пожаловать!\n\n"; user.FirstRun = false; }
 
         string tempHint = "";
         if (temp.HasValue)
