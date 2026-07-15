@@ -303,7 +303,7 @@ class Program
     {
         var (weatherText, _) = await GetWeather(user.CityEn, user.CityRu);
         var timeStr = GetLocalTimeString(user.CityEn, user.CityRu);
-        var shareText = $"Погода в {user.CityRu} сейчас:\n{timeStr}\n{weatherText}\n\nОтправлено из бота @Tgvstestbot";
+        var shareText = $"Погода в {user.CityRu} сейчас:\n{timeStr}\n{weatherText}\n\nОтправлено из бота @infoofcity_bot";
         await bot.SendMessage(chatId, shareText, cancellationToken: ct);
     }
 
