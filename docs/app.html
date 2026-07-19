@@ -52,7 +52,20 @@
             font-size: 24px;
             font-weight: 700;
             letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
+        .edit-city-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .edit-city-btn:active { background: var(--border); }
         .open-bot-btn {
             background: var(--accent);
             color: white;
@@ -140,26 +153,79 @@
             padding: 6px 0;
             font-size: 14px;
             border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
         .history-item:last-child { border-bottom: none; }
-        .history-item small { color: var(--sub); font-size: 12px; }
         .clear-history-btn {
-            background: none;
-            border: none;
-            color: var(--danger);
-            font-size: 13px;
-            cursor: pointer;
-            padding: 4px 8px;
-            margin-top: 8px;
+            background: none; border: none; color: var(--danger);
+            font-size: 13px; cursor: pointer; padding: 4px 8px; margin-top: 8px;
         }
+
+        /* Модальное окно выбора города */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 20px;
+            width: 90%;
+            max-width: 360px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+        .modal h3 { margin-bottom: 12px; font-size: 18px; }
+        .city-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .city-chip {
+            background: var(--accent-light);
+            color: var(--accent);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: background 0.2s;
+        }
+        .city-chip:active { background: var(--accent); color: white; }
+        .modal input {
+            width: 100%; padding: 10px; border-radius: 12px; border: 1px solid var(--border);
+            background: var(--bg); color: var(--text); margin-bottom: 10px;
+        }
+        .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-actions button {
+            padding: 8px 16px; border-radius: 10px; border: none;
+            font-weight: 600; cursor: pointer;
+        }
+        .btn-ok { background: var(--accent); color: white; }
+        .btn-cancel { background: var(--border); color: var(--text); }
     </style>
 </head>
 <body>
+    <!-- Модальное окно -->
+    <div id="cityModal" class="modal-overlay hidden">
+        <div class="modal">
+            <h3>🌍 Выберите город</h3>
+            <div class="city-list">
+                <span class="city-chip" onclick="selectCity('Almetyevsk', 'Альметьевск')">Альметьевск</span>
+                <span class="city-chip" onclick="selectCity('Shymkent', 'Шымкент')">Шымкент</span>
+                <span class="city-chip" onclick="selectCity('Moscow', 'Москва')">Москва</span>
+                <span class="city-chip" onclick="selectCity('Almaty', 'Алматы')">Алматы</span>
+                <span class="city-chip" onclick="selectCity('Astana', 'Астана')">Астана</span>
+            </div>
+            <input type="text" id="customCityInput" placeholder="Или введите другой город (на английском)">
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeCityModal()">Отмена</button>
+                <button class="btn-ok" onclick="applyCustomCity()">ОК</button>
+            </div>
+        </div>
+    </div>
+
     <div class="header">
-        <h1 id="cityTitle">🏙 Загрузка...</h1>
+        <h1 id="cityTitle">
+            🏙 Загрузка...
+            <button class="edit-city-btn" onclick="openCityModal()" title="Сменить город">✏️</button>
+        </h1>
         <a class="open-bot-btn" id="openBotBtn" href="#">💬 Открыть бота</a>
     </div>
 
@@ -244,7 +310,7 @@
 
     <script>
         const WEATHER_KEY = 'b87ebb55d538c2d9213edfad793e6bef';
-        const BOT_USERNAME = 'Infoofcity_bot'; // обновил!
+        const BOT_USERNAME = 'Infoofcity_bot';
         let currentCity = localStorage.getItem('city') || 'Almetyevsk';
         let currentCityRu = localStorage.getItem('cityRu') || 'Альметьевск';
         const tg = window.Telegram.WebApp;
@@ -334,7 +400,7 @@
 
         async function loadWeather() {
             const w = await getWeather(currentCity);
-            document.getElementById('cityTitle').textContent = `🏙 ${currentCityRu}`;
+            document.getElementById('cityTitle').innerHTML = `🏙 ${currentCityRu} <button class="edit-city-btn" onclick="openCityModal()" title="Сменить город">✏️</button>`;
             document.getElementById('weatherCard').innerHTML = `
                 <div class="row"><span class="weather-icon">${w.icon}</span><div><span class="temp-big">${w.temp.toFixed(0)}°C</span><div class="feels">Ощущается ${w.feels.toFixed(0)}°C</div></div></div>
                 <div style="margin-top:10px;">☁ ${w.desc}</div>
@@ -383,7 +449,7 @@
                 </table>`;
         }
 
-        // ИСТОРИЯ КОНВЕРТЕРА
+        // История конвертера
         function getHistory() {
             return JSON.parse(localStorage.getItem('convHistory') || '[]');
         }
@@ -406,7 +472,7 @@
                 return;
             }
             let html = '<div style="font-weight:600; margin-bottom:6px;">📋 Последние конвертации:</div>';
-            history.forEach((item, index) => {
+            history.forEach((item) => {
                 html += `<div class="history-item"><span>${item}</span></div>`;
             });
             html += '<button class="clear-history-btn" onclick="clearHistory()">Очистить историю</button>';
@@ -461,11 +527,53 @@
             else if (tab === 'forecast') loadForecast();
             else if (tab === 'news') loadNews();
             else if (tab === 'rates') loadRates();
-            else if (tab === 'convert') { renderHistory(); } // показываем историю
+            else if (tab === 'convert') { renderHistory(); }
             else if (tab === 'chart') loadChart();
         }
 
-        // Первый запуск – геолокация
+        // Функции модального окна
+        function openCityModal() {
+            document.getElementById('cityModal').classList.remove('hidden');
+            document.getElementById('customCityInput').value = '';
+        }
+        function closeCityModal() {
+            document.getElementById('cityModal').classList.add('hidden');
+        }
+        async function selectCity(eng, ru) {
+            currentCity = eng;
+            currentCityRu = ru;
+            localStorage.setItem('city', currentCity);
+            localStorage.setItem('cityRu', currentCityRu);
+            closeCityModal();
+            // обновляем активную вкладку
+            const activeTab = document.querySelector('.tab-content:not(.hidden)');
+            if (activeTab) {
+                const tabId = activeTab.id.replace('tab-', '');
+                switchTab(tabId);
+            } else {
+                loadWeather();
+            }
+        }
+        async function applyCustomCity() {
+            const input = document.getElementById('customCityInput').value.trim();
+            if (!input) { closeCityModal(); return; }
+            // проверяем существование города
+            try {
+                const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(input)}&appid=${WEATHER_KEY}&units=metric&lang=ru`;
+                const data = await fetchJSON(url);
+                if (data.cod && data.cod !== 200) {
+                    alert('Город не найден');
+                    return;
+                }
+                // Успех – используем название из ответа или введённое
+                const cityName = data.name || input;
+                selectCity(cityName, cityName);
+            } catch (e) {
+                alert('Ошибка при проверке города');
+            }
+        }
+
+        // Геолокация при первом запуске
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
