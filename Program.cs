@@ -278,7 +278,7 @@ class Program
         };
         rows.Add(utilRow.ToArray());
 
-        var webAppUrl = $"https://nem1ch13.github.io/TGBot?city={Uri.EscapeDataString(user.CityEn)}";
+        var webAppUrl = $"https://nem1ch13.github.io/TGBot/app.html";
         rows.Add(new[] { InlineKeyboardButton.WithWebApp("📊 Графики", new WebAppInfo { Url = webAppUrl }) });
 
         await EditOrSendMessage(chatId, user, text, new InlineKeyboardMarkup(rows), ct);
