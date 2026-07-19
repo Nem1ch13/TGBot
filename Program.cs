@@ -164,7 +164,6 @@ class Program
         switch (data)
         {
             case "refresh": case "back": await EditMainMenu(chatId, user, ct); break;
-            // case "news": удалён
             case "forecast": await AnimateLoading(chatId, user, ct, async () => await EditForecast(chatId, user, ct)); break;
             case "rates": await AnimateLoading(chatId, user, ct, async () => await EditRates(chatId, user, ct)); break;
             case "convert": user.ConvertFrom = null; user.ConvertTo = null; user.WaitingForAmount = false; await EditConvertFromMenu(chatId, user, ct); break;
@@ -226,7 +225,7 @@ class Program
     static string CurrencyName(string code) => CurrencyNames.TryGetValue(code, out var name) ? name : code;
     static void SetCity(UserState user, string en, string ru, long chatId) { user.CityEn = en; user.CityRu = ru; db.SaveUser(chatId, user); }
 
-    // EditMainMenu без новостей и без WebApp
+    // Главное меню (без новостей и графика)
     static async Task EditMainMenu(long chatId, UserState user, CancellationToken ct)
     {
         var (weatherText, temp) = await GetWeather(user.CityEn, user.CityRu);
@@ -259,7 +258,6 @@ class Program
 
         var rows = new List<InlineKeyboardButton[]>
         {
-            // удалены "📰 Новости" и "📆 Прогноз" (оставляем Прогноз, но без Новостей)
             new[] { InlineKeyboardButton.WithCallbackData("📆 Прогноз", "forecast"), InlineKeyboardButton.WithCallbackData("💵 Курсы", "rates") },
             new[] { InlineKeyboardButton.WithCallbackData("🧮 Конвертер", "convert"), InlineKeyboardButton.WithCallbackData("🌍 Город", "choose_city") },
             new[] { InlineKeyboardButton.WithCallbackData("📍 Карта", "map"), InlineKeyboardButton.WithCallbackData("❓ Помощь", "help") },
@@ -279,11 +277,10 @@ class Program
         };
         rows.Add(utilRow.ToArray());
 
-        // Удалена кнопка WebApp
         await EditOrSendMessage(chatId, user, text, new InlineKeyboardMarkup(rows), ct);
     }
 
-    // EditHelp без новостей и графиков
+    // Справка без новостей и графиков
     static async Task EditHelp(long chatId, UserState user, CancellationToken ct)
     {
         var help = "❓ *Справка:*\n\n• 🌤 Погода и время\n• 📆 Прогноз на 5 дней\n• 💵 Курсы валют\n• 🧮 Конвертер\n• 🌍 Выбор города\n• 🔔 Подписка\n• 📍 Карта\n• 📊 /stats\n• ⏰ /remind 08:00";
@@ -291,6 +288,126 @@ class Program
         await EditOrSendMessage(chatId, user, help, keyboard, ct);
     }
 
-    // Остальные методы (GetWeather, GetForecast, GetTodayForecast, EditForecast, EditToday, EditHourly, ShareWeather, GetSunriseSunset, GetRates, EditRates, EditConvertFromMenu, EditConvertToMenu, EditHistory, HandleAmountInput, AnimateLoading, DailyNotifyLoop, DangerousWeatherLoop, GetTimeZone, GetLocalTimeString, HandleInlineQuery, EditOrSendMessage, EditOrSendMain, TryGetWeather, Database и др.) оставлены без изменений, но в них нет привязки к новостям. Они идентичны последней версии.
+    // ... (все остальные методы: EditForecast, EditToday, EditHourly, ShareWeather, GetSunriseSunset, GetRates, EditRates, EditConvertFromMenu, EditConvertToMenu, EditHistory, HandleAmountInput, AnimateLoading, DailyNotifyLoop, DangerousWeatherLoop, GetTimeZone, GetLocalTimeString, HandleInlineQuery, EditOrSendMessage, EditOrSendMain, TryGetWeather, GetWeather, GetTodayForecast, EditCityMenu, EditMapLink, Database и UserState) ОСТАВЛЯЕМ БЕЗ ИЗМЕНЕНИЙ, как в последней полной версии.
 }
-// ... (весь оставшийся код с UserState, Database и т.д.) без изменений.
+
+// Классы UserState и Database (оставляем как есть, они не изменились)
+class UserState
+{
+    public string CityEn = "Almetyevsk";
+    public string CityRu = "Альметьевск";
+    public bool WaitingForCustomCity;
+    public bool Subscribed;
+    public int MainMessageId;
+    public bool FirstRun = true;
+
+    public string? ConvertFrom;
+    public string? ConvertTo;
+    public bool WaitingForAmount;
+
+    public int RequestCount;
+    public double? LastTemp;
+    public DateTime LastTempDate;
+
+    public List<string> Favorites = new();
+    public List<string> ConversionHistory = new();
+    public string? RemindTime;
+    public DateTime LastNotifyDate;
+}
+
+class Database
+{
+    readonly string connectionString = "Data Source=/data/bot.db";
+
+    public void Initialize()
+    {
+        Directory.CreateDirectory("/data");
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = @"
+            CREATE TABLE IF NOT EXISTS Users (
+                ChatId INTEGER PRIMARY KEY,
+                CityEn TEXT,
+                CityRu TEXT,
+                Subscribed INTEGER,
+                RemindTime TEXT,
+                LastTemp REAL,
+                LastTempDate TEXT
+            );
+            CREATE TABLE IF NOT EXISTS Favorites (
+                ChatId INTEGER,
+                CityEn TEXT,
+                PRIMARY KEY (ChatId, CityEn)
+            );
+            CREATE TABLE IF NOT EXISTS ConversionHistory (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ChatId INTEGER,
+                EntryText TEXT,
+                CreatedAt TEXT
+            );
+        ";
+        cmd.ExecuteNonQuery();
+    }
+
+    public UserState? LoadUser(long chatId)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = "SELECT CityEn, CityRu, Subscribed, RemindTime, LastTemp, LastTempDate FROM Users WHERE ChatId = @id";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        using var reader = cmd.ExecuteReader();
+        if (reader.Read())
+        {
+            var st = new UserState
+            {
+                CityEn = reader.GetString(0),
+                CityRu = reader.GetString(1),
+                Subscribed = reader.GetInt32(2) == 1,
+                RemindTime = reader.IsDBNull(3) ? null : reader.GetString(3),
+                LastTemp = reader.IsDBNull(4) ? null : reader.GetDouble(4),
+                LastTempDate = reader.IsDBNull(5) ? DateTime.MinValue : DateTime.Parse(reader.GetString(5))
+            };
+            cmd.CommandText = "SELECT CityEn FROM Favorites WHERE ChatId = @id";
+            using var favReader = cmd.ExecuteReader();
+            while (favReader.Read()) st.Favorites.Add(favReader.GetString(0));
+            return st;
+        }
+        return null;
+    }
+
+    public void SaveUser(long chatId, UserState user)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = @"
+            INSERT OR REPLACE INTO Users (ChatId, CityEn, CityRu, Subscribed, RemindTime, LastTemp, LastTempDate)
+            VALUES (@id, @cityEn, @cityRu, @sub, @remind, @temp, @tempDate)";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        cmd.Parameters.AddWithValue("@cityEn", user.CityEn);
+        cmd.Parameters.AddWithValue("@cityRu", user.CityRu);
+        cmd.Parameters.AddWithValue("@sub", user.Subscribed ? 1 : 0);
+        cmd.Parameters.AddWithValue("@remind", (object?)user.RemindTime ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@temp", (object?)user.LastTemp ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@tempDate", user.LastTempDate == DateTime.MinValue ? DBNull.Value : user.LastTempDate.ToString("o"));
+        cmd.ExecuteNonQuery();
+    }
+
+    public void SaveFavorites(long chatId, List<string> favorites)
+    {
+        using var con = new SqliteConnection(connectionString);
+        con.Open();
+        var cmd = con.CreateCommand();
+        cmd.CommandText = "DELETE FROM Favorites WHERE ChatId = @id";
+        cmd.Parameters.AddWithValue("@id", chatId);
+        cmd.ExecuteNonQuery();
+        foreach (var fav in favorites)
+        {
+            cmd.CommandText = "INSERT INTO Favorites (ChatId, CityEn) VALUES (@id, @city)";
+            cmd.Parameters.AddWithValue("@city", fav);
+            cmd.ExecuteNonQuery();
+        }
+    }
+}
