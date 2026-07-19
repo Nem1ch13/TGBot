@@ -23,7 +23,6 @@
             --skeleton-base: #e5e7eb;
             --skeleton-shine: #f3f4f6;
         }
-        /* Тёмная тема будет применена через JS */
         body.dark {
             --bg: #111827;
             --card: #1f2937;
@@ -136,26 +135,19 @@
             width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;
             box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
         }
-        .modal-handle {
-            width: 40px; height: 4px; background: var(--border); border-radius: 2px;
-            margin: 0 auto 16px;
-        }
+        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
         .modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
-        .city-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;
-        }
+        .city-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
         .city-card {
             background: var(--bg); border-radius: 14px; padding: 14px; text-align: center;
-            cursor: pointer; transition: background 0.15s;
-            border: 1px solid transparent;
+            cursor: pointer; transition: background 0.15s; border: 1px solid transparent;
         }
         .city-card:active { background: var(--accent-light); border-color: var(--accent); }
         .city-flag { font-size: 28px; margin-bottom: 4px; }
         .city-name { font-weight: 600; font-size: 16px; }
         .search-box {
             width: 100%; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border);
-            background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 12px;
-            outline: none;
+            background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 12px; outline: none;
         }
         .search-box:focus { border-color: var(--accent); }
 
@@ -191,7 +183,6 @@
         .history-item:last-child { border-bottom: none; }
         .clear-history-btn { background: none; border: none; color: var(--danger); font-size: 13px; cursor: pointer; padding: 4px 8px; margin-top: 8px; }
         
-        /* Skeleton Loading */
         .skeleton {
             background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
             background-size: 200% 100%;
@@ -202,13 +193,13 @@
     </style>
 </head>
 <body>
-    <!-- Модалка выбора города -->
+    <!-- Модальные окна без изменений -->
     <div id="cityModal" class="modal-overlay hidden">
         <div class="modal">
             <div class="modal-handle"></div>
             <h3>🌍 Выберите город</h3>
             <input type="text" id="citySearchInput" class="search-box" placeholder="Поиск города...">
-            <div class="city-grid" id="popularCitiesGrid">
+            <div class="city-grid">
                 <div class="city-card" onclick="selectCity('Almetyevsk', 'Альметьевск')"><div class="city-flag">🇷🇺</div><div class="city-name">Альметьевск</div></div>
                 <div class="city-card" onclick="selectCity('Shymkent', 'Шымкент')"><div class="city-flag">🇰🇿</div><div class="city-name">Шымкент</div></div>
                 <div class="city-card" onclick="selectCity('Moscow', 'Москва')"><div class="city-flag">🇷🇺</div><div class="city-name">Москва</div></div>
@@ -218,7 +209,6 @@
         </div>
     </div>
 
-    <!-- Модалка почасового прогноза -->
     <div id="dayHourlyModal" class="modal-overlay hidden">
         <div class="modal" style="border-radius: 24px; max-height: 70vh;">
             <button class="modal-close" onclick="closeDayHourlyModal()">✕</button>
@@ -227,6 +217,7 @@
         </div>
     </div>
 
+    <!-- Шапка -->
     <div class="header">
         <h1 id="cityTitle">🏙 Загрузка...</h1>
         <button class="city-select-btn" onclick="openCityModal()">
@@ -299,7 +290,7 @@
         tg.ready();
         tg.expand();
 
-        // Автоматическая тема Telegram
+        // Тема
         function applyTheme() {
             if (tg.colorScheme === 'dark') document.body.classList.add('dark');
             else document.body.classList.remove('dark');
@@ -307,47 +298,151 @@
         tg.onEvent('themeChanged', applyTheme);
         applyTheme();
 
+        // Утилиты кэширования
+        function cacheGet(key, maxAgeMs = 15 * 60 * 1000) {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            try {
+                const { data, ts } = JSON.parse(raw);
+                if (Date.now() - ts < maxAgeMs) return data;
+            } catch(e) {}
+            return null;
+        }
+        function cacheSet(key, data) {
+            localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
+        }
+
         async function fetchJSON(url) {
             const res = await fetch(url);
             if (!res.ok) throw new Error('Network error');
             return res.json();
         }
 
-        async function getWeather(city) { /* без изменений */
+        async function getWeather(city) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             const emoji = {'01d':'☀️','01n':'🌙','02d':'⛅','02n':'🌙','03d':'☁','03n':'☁','04d':'☁','04n':'☁','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'🌨','13n':'🌨','50d':'🌫','50n':'🌫'}[data.weather[0].icon] || '🌡';
             return { temp: data.main.temp, feels: data.main.feels_like, desc: data.weather[0].description, hum: data.main.humidity, wind: data.wind.speed, icon: emoji, sunrise: new Date(data.sys.sunrise * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}), sunset: new Date(data.sys.sunset * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) };
         }
 
-        async function getForecast(city) { /* без изменений */
+        async function getForecast(city) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             const daily = {};
             data.list.forEach(item => { const date = item.dt_txt.split(' ')[0]; const temp = item.main.temp; const icon = item.weather[0].icon; const desc = item.weather[0].description; if (!daily[date]) daily[date] = { min: temp, max: temp, icon: icon, desc: desc }; else { if (temp < daily[date].min) daily[date].min = temp; if (temp > daily[date].max) daily[date].max = temp; } });
             return Object.entries(daily).slice(0, 5).map(([date, d]) => ({ date: date, dateStr: new Date(date).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', weekday:'short'}), min: d.min, max: d.max, icon: mapIcon(d.icon), desc: d.desc }));
         }
 
-        async function getHourlyForDate(city, dateStr) { /* без изменений */
+        async function getHourlyForDate(city, dateStr) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             return data.list.filter(item => item.dt_txt.startsWith(dateStr)).map(item => ({ time: item.dt_txt.split(' ')[1].slice(0,5), temp: item.main.temp, icon: mapIcon(item.weather[0].icon), desc: item.weather[0].description }));
         }
 
         function mapIcon(code) { const icons = {'01d':'☀️','01n':'🌙','02d':'⛅','02n':'🌙','03d':'☁','03n':'☁','04d':'☁','04n':'☁','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'🌨','13n':'🌨','50d':'🌫','50n':'🌫'}; return icons[code] || '🌡'; }
 
-        async function getNews(city) { /* без изменений */ 
-            const url = `https://news.google.com/rss/search?q=${encodeURIComponent(city)}&hl=ru&gl=RU&ceid=RU:ru`; const response = await fetch(url); const text = await response.text(); const parser = new DOMParser(); const xml = parser.parseFromString(text, "application/xml"); const items = xml.querySelectorAll("item"); if (!items.length) return [{title: 'Новостей не найдено', link: '#', date: ''}]; return Array.from(items).slice(0, 5).map(item => { const title = item.querySelector("title")?.textContent || ''; const link = item.querySelector("link")?.textContent || '#'; const pubDate = item.querySelector("pubDate")?.textContent || ''; const date = pubDate ? new Date(pubDate).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'}) : ''; return { title, link, date }; });
+        // Новости с кэшем
+        async function getNews(city) {
+            const cacheKey = `news_${city}`;
+            const cached = cacheGet(cacheKey);
+            if (cached) return cached;
+
+            const url = `https://news.google.com/rss/search?q=${encodeURIComponent(city)}&hl=ru&gl=RU&ceid=RU:ru`;
+            const response = await fetch(url);
+            const text = await response.text();
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(text, "application/xml");
+            const items = xml.querySelectorAll("item");
+            if (!items.length) return [{title: 'Новостей не найдено', link: '#', date: ''}];
+            const result = Array.from(items).slice(0, 5).map(item => {
+                const title = item.querySelector("title")?.textContent || '';
+                const link = item.querySelector("link")?.textContent || '#';
+                const pubDate = item.querySelector("pubDate")?.textContent || '';
+                const date = pubDate ? new Date(pubDate).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', year:'numeric'}) : '';
+                return { title, link, date };
+            });
+            cacheSet(cacheKey, result);
+            return result;
         }
 
-        async function getRates() { /* без изменений */
-            const data = await fetchJSON('https://api.exchangerate-api.com/v4/latest/USD'); const r = data.rates; return { RUB: r.RUB, KZT: r.KZT, EUR: r.EUR, GBP: r.GBP, CNY: r.CNY, AED: r.AED, TRY: r.TRY, UAH: r.UAH, KGS: r.KGS, UZS: r.UZS, PLN: r.PLN };
+        // Курсы с кэшем
+        async function getRatesData() {
+            const cacheKey = 'rates';
+            const cached = cacheGet(cacheKey);
+            if (cached) return cached;
+
+            const data = await fetchJSON('https://api.exchangerate-api.com/v4/latest/USD');
+            const r = data.rates;
+            const result = { RUB: r.RUB, KZT: r.KZT, EUR: r.EUR, GBP: r.GBP, CNY: r.CNY, AED: r.AED, TRY: r.TRY, UAH: r.UAH, KGS: r.KGS, UZS: r.UZS, PLN: r.PLN };
+            cacheSet(cacheKey, result);
+            return result;
         }
 
-        async function loadWeather() { /* без изменений */ }
+        async function loadWeather() {
+            const w = await getWeather(currentCity);
+            document.getElementById('cityTitle').innerHTML = `🏙 ${currentCityRu}`;
+            document.getElementById('weatherCard').innerHTML = `
+                <div class="row"><span class="weather-icon">${w.icon}</span><div><span class="temp-big">${w.temp.toFixed(0)}°C</span><div class="feels">Ощущается ${w.feels.toFixed(0)}°C</div></div></div>
+                <div style="margin-top:10px;">☁ ${w.desc}</div>
+                <div class="grid-2">
+                    <div class="detail">💧 Влажность<br><b>${w.hum}%</b></div>
+                    <div class="detail">💨 Ветер<br><b>${w.wind} м/с</b></div>
+                    <div class="detail">🌅 Восход<br><b>${w.sunrise}</b></div>
+                    <div class="detail">🌇 Закат<br><b>${w.sunset}</b></div>
+                </div>`;
+            const todayStr = new Date().toISOString().slice(0,10);
+            const hourly = await getHourlyForDate(currentCity, todayStr);
+            const hourlyHtml = hourly.map(h => `
+                <div class="hourly-item">
+                    <div class="hourly-time">${h.time}</div>
+                    <div class="hourly-icon">${h.icon}</div>
+                    <div class="hourly-temp">${h.temp.toFixed(0)}°</div>
+                </div>
+            `).join('');
+            document.getElementById('hourlyForecast').innerHTML = `
+                <div style="font-weight:600; margin-bottom:8px;">🕒 Почасовой прогноз</div>
+                <div class="hourly-scroll">${hourlyHtml}</div>`;
+        }
 
-        async function loadForecast() { /* без изменений */ }
+        async function loadForecast() {
+            const f = await getForecast(currentCity);
+            const html = f.map(d => `
+                <div class="forecast-card" onclick="openDayHourly('${d.date}')">
+                    <div class="forecast-date">${d.dateStr}</div>
+                    <div class="forecast-icon">${d.icon}</div>
+                    <div class="forecast-temp">${d.min.toFixed(0)}° … ${d.max.toFixed(0)}°</div>
+                    <div class="forecast-desc">${d.desc}</div>
+                </div>
+            `).join('');
+            document.getElementById('forecastCard').innerHTML = `<div class="forecast-grid">${html}</div>`;
+        }
 
-        async function loadNews() { /* без изменений */ }
+        async function loadNews() {
+            const n = await getNews(currentCityRu);
+            document.getElementById('newsCard').innerHTML = n.map(i => `
+                <div class="news-item">
+                    <a href="${i.link}" target="_blank" class="news-link">${i.title}</a>
+                    <div class="news-date">${i.date || ''}</div>
+                </div>`).join('');
+        }
 
-        async function loadRates() { /* без изменений */ }
+        async function loadRates() {
+            const r = await getRatesData();
+            const safe = (a,b) => b? a/b : 0;
+            document.getElementById('ratesCard').innerHTML = `
+                <table class="rate-table">
+                    <tr><th>Валюта</th><th>USD</th><th>RUB</th><th>KZT</th></tr>
+                    <tr><td>🇷🇺 RUB</td><td>${(1/r.RUB).toFixed(4)}</td><td>1.0000</td><td>${(1/(r.RUB/r.KZT)).toFixed(2)}</td></tr>
+                    <tr><td>🇰🇿 KZT</td><td>${(1/r.KZT).toFixed(4)}</td><td>${safe(1, r.RUB/r.KZT).toFixed(4)}</td><td>1.0000</td></tr>
+                    <tr><td>🇺🇸 USD</td><td>1.0000</td><td>${r.RUB.toFixed(2)}</td><td>${r.KZT.toFixed(2)}</td></tr>
+                    <tr><td>🇪🇺 EUR</td><td>${r.EUR.toFixed(4)}</td><td>${safe(r.RUB, r.EUR).toFixed(2)}</td><td>${safe(r.KZT, r.EUR).toFixed(2)}</td></tr>
+                    <tr><td>🇬🇧 GBP</td><td>${r.GBP.toFixed(4)}</td><td>${safe(r.RUB, r.GBP).toFixed(2)}</td><td>${safe(r.KZT, r.GBP).toFixed(2)}</td></tr>
+                    <tr><td>🇨🇳 CNY</td><td>${r.CNY.toFixed(4)}</td><td>${safe(r.RUB, r.CNY).toFixed(2)}</td><td>${safe(r.KZT, r.CNY).toFixed(2)}</td></tr>
+                    <tr><td>🇦🇪 AED</td><td>${r.AED.toFixed(4)}</td><td>${safe(r.RUB, r.AED).toFixed(2)}</td><td>${safe(r.KZT, r.AED).toFixed(2)}</td></tr>
+                    <tr><td>🇹🇷 TRY</td><td>${r.TRY.toFixed(4)}</td><td>${safe(r.RUB, r.TRY).toFixed(2)}</td><td>${safe(r.KZT, r.TRY).toFixed(2)}</td></tr>
+                    <tr><td>🇺🇦 UAH</td><td>${r.UAH.toFixed(4)}</td><td>${safe(r.RUB, r.UAH).toFixed(2)}</td><td>${safe(r.KZT, r.UAH).toFixed(2)}</td></tr>
+                    <tr><td>🇰🇬 KGS</td><td>${r.KGS.toFixed(4)}</td><td>${safe(r.RUB, r.KGS).toFixed(2)}</td><td>${safe(r.KZT, r.KGS).toFixed(2)}</td></tr>
+                    <tr><td>🇺🇿 UZS</td><td>${r.UZS.toFixed(0)}</td><td>${safe(r.RUB, r.UZS).toFixed(0)}</td><td>${safe(r.KZT, r.UZS).toFixed(0)}</td></tr>
+                    <tr><td>🇵🇱 PLN</td><td>${(1/r.PLN).toFixed(4)}</td><td>${safe(r.RUB, r.PLN).toFixed(2)}</td><td>${safe(r.KZT, r.PLN).toFixed(2)}</td></tr>
+                </table>`;
+        }
 
         function swapCurrencies() {
             const from = document.getElementById('convertFrom');
@@ -360,12 +455,55 @@
         function getHistory() { return JSON.parse(localStorage.getItem('convHistory') || '[]'); }
         function addHistory(entry) { let history = getHistory(); history.unshift(entry); if (history.length > 5) history.pop(); localStorage.setItem('convHistory', JSON.stringify(history)); renderHistory(); }
         function clearHistory() { localStorage.removeItem('convHistory'); renderHistory(); }
-        function renderHistory() { /* без изменений */ }
+        function renderHistory() {
+            const container = document.getElementById('historyContainer');
+            const history = getHistory();
+            if (history.length === 0) {
+                container.innerHTML = '<div style="color:var(--sub); font-size:14px;">История пуста</div>';
+                return;
+            }
+            let html = '<div style="font-weight:600; margin-bottom:6px;">📋 Последние конвертации:</div>';
+            history.forEach(item => html += `<div class="history-item"><span>${item}</span></div>`);
+            html += '<button class="clear-history-btn" onclick="clearHistory()">Очистить историю</button>';
+            container.innerHTML = html;
+        }
 
-        async function doConvert() { /* без изменений, но теперь без изменений в логике */ }
+        async function doConvert() {
+            const amount = +document.getElementById('convertAmount').value;
+            const from = document.getElementById('convertFrom').value;
+            const to = document.getElementById('convertTo').value;
+            if (!amount || amount <= 0) {
+                document.getElementById('convertResult').textContent = 'Введите положительную сумму';
+                return;
+            }
+            try {
+                const data = await fetchJSON(`https://api.exchangerate-api.com/v4/latest/${from}`);
+                const rate = data.rates[to];
+                const res = amount * rate;
+                const resultText = `${amount} ${from} = ${res.toFixed(2)} ${to}`;
+                document.getElementById('convertResult').textContent = resultText;
+                addHistory(resultText);
+            } catch(e) {
+                document.getElementById('convertResult').textContent = 'Ошибка конвертации';
+            }
+        }
 
         let chartInstance;
-        async function loadChart() { /* без изменений */ }
+        async function loadChart() {
+            const f = await getForecast(currentCity);
+            if (chartInstance) chartInstance.destroy();
+            const ctx = document.getElementById('tempChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: f.map(d => d.dateStr),
+                    datasets: [
+                        { label: 'Мин.', data: f.map(d => d.min), borderColor: '#3b82f6', fill: false },
+                        { label: 'Макс.', data: f.map(d => d.max), borderColor: '#ef4444', fill: false }
+                    ]
+                }
+            });
+        }
 
         function openCityModal() { document.getElementById('cityModal').classList.remove('hidden'); document.getElementById('citySearchInput').value = ''; document.getElementById('citySearchInput').focus(); }
         function closeCityModal() { document.getElementById('cityModal').classList.add('hidden'); }
@@ -391,7 +529,7 @@
             else if (tab === 'chart') loadChart();
         }
 
-        // Старт
+        // Первый запуск
         loadWeather();
     </script>
 </body>
