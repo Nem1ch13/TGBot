@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>МетеоКомбайн</title>
+    <title>Всё под рукой</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -43,11 +43,32 @@
             transition: background 0.2s;
         }
         .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 20px 20px 10px;
+        }
+        .header h1 {
             font-size: 24px;
             font-weight: 700;
             letter-spacing: -0.5px;
         }
+        .open-bot-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: opacity 0.2s;
+            text-decoration: none;
+        }
+        .open-bot-btn:active { opacity: 0.8; }
         .card {
             background: var(--card);
             border-radius: var(--radius);
@@ -90,25 +111,10 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.03);
             border: 1px solid var(--border);
         }
-        .forecast-date {
-            font-size: 13px;
-            color: var(--sub);
-            margin-bottom: 6px;
-        }
-        .forecast-icon {
-            font-size: 32px;
-            margin: 4px 0;
-        }
-        .forecast-temp {
-            font-size: 18px;
-            font-weight: 700;
-            margin: 4px 0;
-        }
-        .forecast-desc {
-            font-size: 12px;
-            color: var(--sub);
-            text-transform: capitalize;
-        }
+        .forecast-date { font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+        .forecast-icon { font-size: 32px; margin: 4px 0; }
+        .forecast-temp { font-size: 18px; font-weight: 700; margin: 4px 0; }
+        .forecast-desc { font-size: 12px; color: var(--sub); text-transform: capitalize; }
         .rate-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
         .rate-table th, .rate-table td { padding: 6px 4px; text-align: right; }
         .rate-table th { color: var(--sub); font-weight: 500; border-bottom: 1px solid var(--border); }
@@ -128,21 +134,34 @@
             border-bottom: 1px solid var(--border);
         }
         .news-item:last-child { border-bottom: none; }
-        .news-link {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 600;
-            font-size: 15px;
+        .news-link { color: var(--accent); text-decoration: none; font-weight: 600; font-size: 15px; }
+        .news-date { font-size: 12px; color: var(--sub); margin-top: 4px; }
+        .history-item {
+            padding: 6px 0;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .news-date {
-            font-size: 12px;
-            color: var(--sub);
-            margin-top: 4px;
+        .history-item:last-child { border-bottom: none; }
+        .history-item small { color: var(--sub); font-size: 12px; }
+        .clear-history-btn {
+            background: none;
+            border: none;
+            color: var(--danger);
+            font-size: 13px;
+            cursor: pointer;
+            padding: 4px 8px;
+            margin-top: 8px;
         }
     </style>
 </head>
 <body>
-    <div class="header" id="cityTitle">🏙 Загрузка...</div>
+    <div class="header">
+        <h1 id="cityTitle">🏙 Загрузка...</h1>
+        <a class="open-bot-btn" id="openBotBtn" href="#">💬 Открыть бота</a>
+    </div>
 
     <!-- Вкладки -->
     <div id="tab-weather" class="tab-content">
@@ -162,17 +181,30 @@
             <div class="converter">
                 <input type="number" id="convertAmount" placeholder="Сумма" value="100">
                 <select id="convertFrom">
-                    <option value="RUB">🇷🇺 RUB</option><option value="KZT">🇰🇿 KZT</option><option value="USD">🇺🇸 USD</option>
-                    <option value="EUR">🇪🇺 EUR</option><option value="GBP">🇬🇧 GBP</option><option value="PLN">🇵🇱 PLN</option>
-                    <option value="CNY">🇨🇳 CNY</option><option value="TRY">🇹🇷 TRY</option><option value="UAH">🇺🇦 UAH</option>
+                    <option value="RUB">🇷🇺 RUB - Рубль</option>
+                    <option value="KZT">🇰🇿 KZT - Тенге</option>
+                    <option value="USD">🇺🇸 USD - Доллар</option>
+                    <option value="EUR">🇪🇺 EUR - Евро</option>
+                    <option value="GBP">🇬🇧 GBP - Фунт</option>
+                    <option value="PLN">🇵🇱 PLN - Злотый</option>
+                    <option value="CNY">🇨🇳 CNY - Юань</option>
+                    <option value="TRY">🇹🇷 TRY - Лира</option>
+                    <option value="UAH">🇺🇦 UAH - Гривна</option>
                 </select>
                 <select id="convertTo">
-                    <option value="KZT">🇰🇿 KZT</option><option value="RUB">🇷🇺 RUB</option><option value="USD">🇺🇸 USD</option>
-                    <option value="EUR">🇪🇺 EUR</option><option value="GBP">🇬🇧 GBP</option><option value="PLN">🇵🇱 PLN</option>
-                    <option value="CNY">🇨🇳 CNY</option><option value="TRY">🇹🇷 TRY</option><option value="UAH">🇺🇦 UAH</option>
+                    <option value="KZT">🇰🇿 KZT - Тенге</option>
+                    <option value="RUB">🇷🇺 RUB - Рубль</option>
+                    <option value="USD">🇺🇸 USD - Доллар</option>
+                    <option value="EUR">🇪🇺 EUR - Евро</option>
+                    <option value="GBP">🇬🇧 GBP - Фунт</option>
+                    <option value="PLN">🇵🇱 PLN - Злотый</option>
+                    <option value="CNY">🇨🇳 CNY - Юань</option>
+                    <option value="TRY">🇹🇷 TRY - Лира</option>
+                    <option value="UAH">🇺🇦 UAH - Гривна</option>
                 </select>
                 <button onclick="doConvert()">Конвертировать</button>
                 <div id="convertResult" style="font-weight:600; margin-top:4px;"></div>
+                <div id="historyContainer" style="margin-top:12px;"></div>
             </div>
         </div>
     </div>
@@ -212,11 +244,18 @@
 
     <script>
         const WEATHER_KEY = 'b87ebb55d538c2d9213edfad793e6bef';
+        const BOT_USERNAME = 'Infoofcity_bot'; // обновил!
         let currentCity = localStorage.getItem('city') || 'Almetyevsk';
         let currentCityRu = localStorage.getItem('cityRu') || 'Альметьевск';
         const tg = window.Telegram.WebApp;
         tg.ready();
         tg.expand();
+
+        // Кнопка "Открыть бота"
+        document.getElementById('openBotBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            tg.openTelegramLink(`https://t.me/${BOT_USERNAME}`);
+        });
 
         async function fetchJSON(url) {
             const res = await fetch(url);
@@ -344,16 +383,51 @@
                 </table>`;
         }
 
+        // ИСТОРИЯ КОНВЕРТЕРА
+        function getHistory() {
+            return JSON.parse(localStorage.getItem('convHistory') || '[]');
+        }
+        function addHistory(entry) {
+            let history = getHistory();
+            history.unshift(entry);
+            if (history.length > 5) history.pop();
+            localStorage.setItem('convHistory', JSON.stringify(history));
+            renderHistory();
+        }
+        function clearHistory() {
+            localStorage.removeItem('convHistory');
+            renderHistory();
+        }
+        function renderHistory() {
+            const container = document.getElementById('historyContainer');
+            const history = getHistory();
+            if (history.length === 0) {
+                container.innerHTML = '<div style="color:var(--sub); font-size:14px;">История пуста</div>';
+                return;
+            }
+            let html = '<div style="font-weight:600; margin-bottom:6px;">📋 Последние конвертации:</div>';
+            history.forEach((item, index) => {
+                html += `<div class="history-item"><span>${item}</span></div>`;
+            });
+            html += '<button class="clear-history-btn" onclick="clearHistory()">Очистить историю</button>';
+            container.innerHTML = html;
+        }
+
         async function doConvert() {
             const amount = +document.getElementById('convertAmount').value;
             const from = document.getElementById('convertFrom').value;
             const to = document.getElementById('convertTo').value;
-            if (!amount) return;
+            if (!amount || amount <= 0) {
+                document.getElementById('convertResult').textContent = 'Введите положительную сумму';
+                return;
+            }
             try {
                 const data = await fetchJSON(`https://api.exchangerate-api.com/v4/latest/${from}`);
                 const rate = data.rates[to];
                 const res = amount * rate;
-                document.getElementById('convertResult').textContent = `${amount} ${from} = ${res.toFixed(2)} ${to}`;
+                const resultText = `${amount} ${from} = ${res.toFixed(2)} ${to}`;
+                document.getElementById('convertResult').textContent = resultText;
+                addHistory(resultText);
             } catch(e) {
                 document.getElementById('convertResult').textContent = 'Ошибка конвертации';
             }
@@ -387,9 +461,11 @@
             else if (tab === 'forecast') loadForecast();
             else if (tab === 'news') loadNews();
             else if (tab === 'rates') loadRates();
+            else if (tab === 'convert') { renderHistory(); } // показываем историю
             else if (tab === 'chart') loadChart();
         }
 
+        // Первый запуск – геолокация
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
