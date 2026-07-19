@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* все стили остаются прежними + добавим стили для почасового прогноза и модалки */
         :root {
             --bg: #f5f7fa;
             --card: #ffffff;
@@ -53,18 +52,23 @@
             font-size: 24px;
             font-weight: 700;
             letter-spacing: -0.5px;
+        }
+        .city-select-btn {
+            background: var(--accent-light);
+            color: var(--accent);
+            border: none;
+            padding: 10px 18px;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            transition: background 0.2s;
+            white-space: nowrap;
         }
-        .edit-city-btn {
-            background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px; border-radius: 8px;
-        }
-        .open-bot-btn {
-            background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 12px;
-            font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;
-            text-decoration: none;
-        }
+        .city-select-btn:active { background: var(--accent); color: white; }
         .card {
             background: var(--card); border-radius: var(--radius); padding: 18px; margin: 0 16px 12px; box-shadow: var(--shadow);
         }
@@ -89,7 +93,6 @@
         .nav-btn.active { color: var(--tab-active); font-weight: 600; }
         .nav-btn svg { width: 24px; height: 24px; }
 
-        /* Почасовой прогноз */
         .hourly-scroll {
             display: flex; overflow-x: auto; gap: 12px; padding-bottom: 8px; margin-top: 12px;
             -webkit-overflow-scrolling: touch;
@@ -102,7 +105,6 @@
         .hourly-icon { font-size: 24px; }
         .hourly-temp { font-weight: 600; margin-top: 4px; }
 
-        /* Прогноз (5 дней) */
         .forecast-grid {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;
         }
@@ -117,30 +119,55 @@
         .forecast-temp { font-size: 18px; font-weight: 700; margin: 4px 0; }
         .forecast-desc { font-size: 12px; color: var(--sub); text-transform: capitalize; }
 
-        /* Модальное окно для почасового прогноза дня */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
-            z-index: 1000;
+            background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; justify-content: center;
+            z-index: 1000; animation: fadeIn 0.2s ease;
         }
+        @keyframes fadeIn { from { opacity: 0; } }
         .modal {
-            background: var(--card); border-radius: var(--radius); padding: 20px;
-            width: 90%; max-width: 400px; max-height: 80vh; overflow-y: auto;
+            background: var(--card); border-radius: 24px 24px 0 0; padding: 24px 20px 30px;
+            width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;
+            box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
         }
-        .modal h3 { margin-bottom: 12px; }
-        .modal-close {
-            float: right; background: none; border: none; font-size: 20px; cursor: pointer;
+        .modal-handle {
+            width: 40px; height: 4px; background: var(--border); border-radius: 2px;
+            margin: 0 auto 16px;
         }
-        .hourly-detail-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 8px 0; border-bottom: 1px solid var(--border);
+        .modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+        .city-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px;
         }
+        .city-card {
+            background: var(--bg); border-radius: 14px; padding: 14px; text-align: center;
+            cursor: pointer; transition: background 0.15s;
+            border: 1px solid transparent;
+        }
+        .city-card:active { background: var(--accent-light); border-color: var(--accent); }
+        .city-flag { font-size: 28px; margin-bottom: 4px; }
+        .city-name { font-weight: 600; font-size: 16px; }
+        .search-box {
+            width: 100%; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border);
+            background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 12px;
+            outline: none;
+        }
+        .search-box:focus { border-color: var(--accent); }
+        .geo-btn {
+            width: 100%; padding: 12px; border-radius: 14px; background: var(--accent);
+            color: white; border: none; font-size: 16px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .geo-btn:active { opacity: 0.8; }
 
-        /* остальное (таблица курсов, конвертер, новости) без изменений */
-        .rate-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+        .rate-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         .rate-table th, .rate-table td { padding: 6px 4px; text-align: right; }
         .rate-table th { color: var(--sub); font-weight: 500; border-bottom: 1px solid var(--border); }
         .rate-table td:first-child, .rate-table th:first-child { text-align: left; }
+        .refresh-btn {
+            background: none; border: 1px solid var(--border); color: var(--text);
+            padding: 4px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
+            margin-bottom: 8px; display: inline-flex; align-items: center; gap: 4px;
+        }
         .converter { display: flex; flex-direction: column; gap: 8px; }
         .converter input, .converter select, .converter button {
             padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
@@ -160,28 +187,44 @@
     </style>
 </head>
 <body>
-    <!-- Модалка для выбора города (такая же) -->
+    <!-- Модальное окно выбора города -->
     <div id="cityModal" class="modal-overlay hidden">
         <div class="modal">
+            <div class="modal-handle"></div>
             <h3>🌍 Выберите город</h3>
-            <div class="city-list">
-                <span class="city-chip" onclick="selectCity('Almetyevsk', 'Альметьевск')">Альметьевск</span>
-                <span class="city-chip" onclick="selectCity('Shymkent', 'Шымкент')">Шымкент</span>
-                <span class="city-chip" onclick="selectCity('Moscow', 'Москва')">Москва</span>
-                <span class="city-chip" onclick="selectCity('Almaty', 'Алматы')">Алматы</span>
-                <span class="city-chip" onclick="selectCity('Astana', 'Астана')">Астана</span>
+            <input type="text" id="citySearchInput" class="search-box" placeholder="Поиск города...">
+            <div class="city-grid" id="popularCitiesGrid">
+                <div class="city-card" onclick="selectCity('Almetyevsk', 'Альметьевск')">
+                    <div class="city-flag">🇷🇺</div>
+                    <div class="city-name">Альметьевск</div>
+                </div>
+                <div class="city-card" onclick="selectCity('Shymkent', 'Шымкент')">
+                    <div class="city-flag">🇰🇿</div>
+                    <div class="city-name">Шымкент</div>
+                </div>
+                <div class="city-card" onclick="selectCity('Moscow', 'Москва')">
+                    <div class="city-flag">🇷🇺</div>
+                    <div class="city-name">Москва</div>
+                </div>
+                <div class="city-card" onclick="selectCity('Almaty', 'Алматы')">
+                    <div class="city-flag">🇰🇿</div>
+                    <div class="city-name">Алматы</div>
+                </div>
+                <div class="city-card" onclick="selectCity('Astana', 'Астана')">
+                    <div class="city-flag">🇰🇿</div>
+                    <div class="city-name">Астана</div>
+                </div>
             </div>
-            <input type="text" id="customCityInput" placeholder="Или введите другой город (на английском)">
-            <div class="modal-actions">
-                <button class="btn-cancel" onclick="closeCityModal()">Отмена</button>
-                <button class="btn-ok" onclick="applyCustomCity()">ОК</button>
-            </div>
+            <button class="geo-btn" onclick="useGeolocation()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
+                Определить геолокацию
+            </button>
         </div>
     </div>
 
-    <!-- Модалка для почасового прогноза дня -->
+    <!-- Модальное окно почасового прогноза дня -->
     <div id="dayHourlyModal" class="modal-overlay hidden">
-        <div class="modal">
+        <div class="modal" style="border-radius: 24px; max-height: 70vh;">
             <button class="modal-close" onclick="closeDayHourlyModal()">✕</button>
             <h3 id="dayHourlyTitle">Почасовой прогноз</h3>
             <div id="dayHourlyContent"></div>
@@ -190,7 +233,10 @@
 
     <div class="header">
         <h1 id="cityTitle">🏙 Загрузка...</h1>
-        <a class="open-bot-btn" id="openBotBtn" href="#">💬 Открыть бота</a>
+        <button class="city-select-btn" onclick="openCityModal()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            Выбрать город
+        </button>
     </div>
 
     <!-- Вкладки -->
@@ -205,7 +251,16 @@
         <div class="card" id="newsCard"><div class="spinner">⏳ Загрузка...</div></div>
     </div>
     <div id="tab-rates" class="tab-content hidden">
-        <div class="card" id="ratesCard"><div class="spinner">⏳ Загрузка...</div></div>
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-weight:600;">💵 Курсы валют</span>
+                <button class="refresh-btn" onclick="loadRates()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                    Обновить
+                </button>
+            </div>
+            <div id="ratesCard"><div class="spinner">⏳ Загрузка...</div></div>
+        </div>
     </div>
     <div id="tab-convert" class="tab-content hidden">
         <div class="card">
@@ -282,18 +337,12 @@
         tg.ready();
         tg.expand();
 
-        document.getElementById('openBotBtn').addEventListener('click', e => {
-            e.preventDefault();
-            tg.openTelegramLink(`https://t.me/${BOT_USERNAME}`);
-        });
-
         async function fetchJSON(url) {
             const res = await fetch(url);
             if (!res.ok) throw new Error('Network error');
             return res.json();
         }
 
-        // Погода сейчас
         async function getWeather(city) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             const emoji = {
@@ -312,7 +361,6 @@
             };
         }
 
-        // Прогноз (5 дней)
         async function getForecast(city) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             const daily = {};
@@ -337,7 +385,6 @@
             }));
         }
 
-        // Почасовой прогноз на конкретный день
         async function getHourlyForDate(city, dateStr) {
             const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
             return data.list
@@ -358,7 +405,6 @@
             return icons[code] || '🌡';
         }
 
-        // Новости (напрямую RSS Google News через парсинг XML)
         async function getNews(city) {
             const url = `https://news.google.com/rss/search?q=${encodeURIComponent(city)}&hl=ru&gl=RU&ceid=RU:ru`;
             const response = await fetch(url);
@@ -384,7 +430,7 @@
 
         async function loadWeather() {
             const w = await getWeather(currentCity);
-            document.getElementById('cityTitle').innerHTML = `🏙 ${currentCityRu} <button class="edit-city-btn" onclick="openCityModal()">✏️</button>`;
+            document.getElementById('cityTitle').innerHTML = `🏙 ${currentCityRu}`;
             document.getElementById('weatherCard').innerHTML = `
                 <div class="row"><span class="weather-icon">${w.icon}</span><div><span class="temp-big">${w.temp.toFixed(0)}°C</span><div class="feels">Ощущается ${w.feels.toFixed(0)}°C</div></div></div>
                 <div style="margin-top:10px;">☁ ${w.desc}</div>
@@ -394,7 +440,6 @@
                     <div class="detail">🌅 Восход<br><b>${w.sunrise}</b></div>
                     <div class="detail">🌇 Закат<br><b>${w.sunset}</b></div>
                 </div>`;
-            // Загружаем почасовой прогноз на сегодня
             const todayStr = new Date().toISOString().slice(0,10);
             const hourly = await getHourlyForDate(currentCity, todayStr);
             const hourlyHtml = hourly.map(h => `
@@ -442,11 +487,16 @@
                     <tr><td>🇺🇸 USD</td><td>1.0000</td><td>${r.RUB.toFixed(2)}</td><td>${r.KZT.toFixed(2)}</td></tr>
                     <tr><td>🇪🇺 EUR</td><td>${r.EUR.toFixed(4)}</td><td>${safe(r.RUB, r.EUR).toFixed(2)}</td><td>${safe(r.KZT, r.EUR).toFixed(2)}</td></tr>
                     <tr><td>🇬🇧 GBP</td><td>${r.GBP.toFixed(4)}</td><td>${safe(r.RUB, r.GBP).toFixed(2)}</td><td>${safe(r.KZT, r.GBP).toFixed(2)}</td></tr>
+                    <tr><td>🇨🇳 CNY</td><td>${r.CNY.toFixed(4)}</td><td>${safe(r.RUB, r.CNY).toFixed(2)}</td><td>${safe(r.KZT, r.CNY).toFixed(2)}</td></tr>
+                    <tr><td>🇦🇪 AED</td><td>${r.AED.toFixed(4)}</td><td>${safe(r.RUB, r.AED).toFixed(2)}</td><td>${safe(r.KZT, r.AED).toFixed(2)}</td></tr>
+                    <tr><td>🇹🇷 TRY</td><td>${r.TRY.toFixed(4)}</td><td>${safe(r.RUB, r.TRY).toFixed(2)}</td><td>${safe(r.KZT, r.TRY).toFixed(2)}</td></tr>
+                    <tr><td>🇺🇦 UAH</td><td>${r.UAH.toFixed(4)}</td><td>${safe(r.RUB, r.UAH).toFixed(2)}</td><td>${safe(r.KZT, r.UAH).toFixed(2)}</td></tr>
+                    <tr><td>🇰🇬 KGS</td><td>${r.KGS.toFixed(4)}</td><td>${safe(r.RUB, r.KGS).toFixed(2)}</td><td>${safe(r.KZT, r.KGS).toFixed(2)}</td></tr>
+                    <tr><td>🇺🇿 UZS</td><td>${r.UZS.toFixed(0)}</td><td>${safe(r.RUB, r.UZS).toFixed(0)}</td><td>${safe(r.KZT, r.UZS).toFixed(0)}</td></tr>
                     <tr><td>🇵🇱 PLN</td><td>${(1/r.PLN).toFixed(4)}</td><td>${safe(r.RUB, r.PLN).toFixed(2)}</td><td>${safe(r.KZT, r.PLN).toFixed(2)}</td></tr>
                 </table>`;
         }
 
-        // Конвертер + история
         function getHistory() { return JSON.parse(localStorage.getItem('convHistory') || '[]'); }
         function addHistory(entry) {
             let history = getHistory();
@@ -506,10 +556,10 @@
             });
         }
 
-        // Модалки
         function openCityModal() {
             document.getElementById('cityModal').classList.remove('hidden');
-            document.getElementById('customCityInput').value = '';
+            document.getElementById('citySearchInput').value = '';
+            document.getElementById('citySearchInput').focus();
         }
         function closeCityModal() { document.getElementById('cityModal').classList.add('hidden'); }
         async function selectCity(eng, ru) {
@@ -520,17 +570,30 @@
             if (activeTab) switchTab(activeTab.id.replace('tab-',''));
             else loadWeather();
         }
-        async function applyCustomCity() {
-            const input = document.getElementById('customCityInput').value.trim();
-            if (!input) { closeCityModal(); return; }
-            try {
-                const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(input)}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-                if (data.cod && data.cod !== 200) { alert('Город не найден'); return; }
-                selectCity(data.name || input, data.name || input);
-            } catch (e) { alert('Ошибка при проверке города'); }
+
+        async function useGeolocation() {
+            if (!navigator.geolocation) { alert('Геолокация не поддерживается'); return; }
+            navigator.geolocation.getCurrentPosition(async pos => {
+                try {
+                    const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
+                    if (data.name) selectCity(data.name, data.name);
+                    else alert('Не удалось определить город');
+                } catch (e) { alert('Ошибка геолокации'); }
+            }, () => alert('Доступ к геолокации запрещён'));
         }
 
-        // Модалка почасового прогноза дня
+        document.getElementById('citySearchInput').addEventListener('keydown', async function(e) {
+            if (e.key === 'Enter') {
+                const input = this.value.trim();
+                if (!input) return;
+                try {
+                    const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(input)}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
+                    if (data.cod && data.cod !== 200) { alert('Город не найден'); return; }
+                    selectCity(data.name || input, data.name || input);
+                } catch (e) { alert('Ошибка при проверке города'); }
+            }
+        });
+
         async function openDayHourly(dateStr) {
             document.getElementById('dayHourlyModal').classList.remove('hidden');
             document.getElementById('dayHourlyTitle').textContent = `Почасовой прогноз на ${new Date(dateStr).toLocaleDateString('ru-RU')}`;
@@ -561,7 +624,6 @@
             else if (tab === 'chart') loadChart();
         }
 
-        // Геолокация при старте
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
