@@ -152,12 +152,6 @@
             outline: none;
         }
         .search-box:focus { border-color: var(--accent); }
-        .geo-btn {
-            width: 100%; padding: 12px; border-radius: 14px; background: var(--accent);
-            color: white; border: none; font-size: 16px; font-weight: 600; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 8px;
-        }
-        .geo-btn:active { opacity: 0.8; }
 
         .rate-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
         .rate-table th, .rate-table td { padding: 6px 4px; text-align: right; }
@@ -187,7 +181,7 @@
     </style>
 </head>
 <body>
-    <!-- Модальное окно выбора города -->
+    <!-- Модальное окно выбора города (без геолокации) -->
     <div id="cityModal" class="modal-overlay hidden">
         <div class="modal">
             <div class="modal-handle"></div>
@@ -215,10 +209,6 @@
                     <div class="city-name">Астана</div>
                 </div>
             </div>
-            <button class="geo-btn" onclick="useGeolocation()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
-                Определить геолокацию
-            </button>
         </div>
     </div>
 
@@ -330,7 +320,6 @@
 
     <script>
         const WEATHER_KEY = 'b87ebb55d538c2d9213edfad793e6bef';
-        const BOT_USERNAME = 'Infoofcity_bot';
         let currentCity = localStorage.getItem('city') || 'Almetyevsk';
         let currentCityRu = localStorage.getItem('cityRu') || 'Альметьевск';
         const tg = window.Telegram.WebApp;
@@ -571,17 +560,6 @@
             else loadWeather();
         }
 
-        async function useGeolocation() {
-            if (!navigator.geolocation) { alert('Геолокация не поддерживается'); return; }
-            navigator.geolocation.getCurrentPosition(async pos => {
-                try {
-                    const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-                    if (data.name) selectCity(data.name, data.name);
-                    else alert('Не удалось определить город');
-                } catch (e) { alert('Ошибка геолокации'); }
-            }, () => alert('Доступ к геолокации запрещён'));
-        }
-
         document.getElementById('citySearchInput').addEventListener('keydown', async function(e) {
             if (e.key === 'Enter') {
                 const input = this.value.trim();
@@ -624,20 +602,8 @@
             else if (tab === 'chart') loadChart();
         }
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async pos => {
-                try {
-                    const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-                    if (data.name) {
-                        currentCity = data.name;
-                        currentCityRu = data.name;
-                        localStorage.setItem('city', currentCity);
-                        localStorage.setItem('cityRu', currentCityRu);
-                    }
-                } catch(e) {}
-                loadWeather();
-            }, () => loadWeather());
-        } else loadWeather();
+        // При первом запуске просто загружаем город из памяти (по умолчанию Альметьевск), без геолокации
+        loadWeather();
     </script>
 </body>
 </html>
