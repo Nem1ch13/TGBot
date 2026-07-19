@@ -76,8 +76,39 @@
         }
         .nav-btn.active { color: var(--tab-active); font-weight: 600; }
         .nav-btn svg { width: 24px; height: 24px; }
-        .forecast-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
-        .forecast-item:last-child { border-bottom: none; }
+        .forecast-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .forecast-card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 14px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+            border: 1px solid var(--border);
+        }
+        .forecast-date {
+            font-size: 13px;
+            color: var(--sub);
+            margin-bottom: 6px;
+        }
+        .forecast-icon {
+            font-size: 32px;
+            margin: 4px 0;
+        }
+        .forecast-temp {
+            font-size: 18px;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+        .forecast-desc {
+            font-size: 12px;
+            color: var(--sub);
+            text-transform: capitalize;
+        }
         .rate-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
         .rate-table th, .rate-table td { padding: 6px 4px; text-align: right; }
         .rate-table th { color: var(--sub); font-weight: 500; border-bottom: 1px solid var(--border); }
@@ -91,6 +122,23 @@
         .spinner { text-align: center; padding: 40px; color: var(--sub); }
         .hidden { display: none !important; }
         canvas { margin-top: 12px; }
+        .news-item {
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .news-item:last-child { border-bottom: none; }
+        .news-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 15px;
+        }
+        .news-date {
+            font-size: 12px;
+            color: var(--sub);
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body>
@@ -101,7 +149,7 @@
         <div class="card" id="weatherCard"><div class="spinner">⏳ Загрузка...</div></div>
     </div>
     <div id="tab-forecast" class="tab-content hidden">
-        <div class="card" id="forecastCard"><div class="spinner">⏳ Загрузка...</div></div>
+        <div class="card"><div id="forecastCard"><div class="spinner">⏳ Загрузка...</div></div></div>
     </div>
     <div id="tab-news" class="tab-content hidden">
         <div class="card" id="newsCard"><div class="spinner">⏳ Загрузка...</div></div>
@@ -200,7 +248,9 @@
             data.list.forEach(item => {
                 const date = item.dt_txt.split(' ')[0];
                 const temp = item.main.temp;
-                if (!daily[date]) daily[date] = { min: temp, max: temp, desc: item.weather[0].description };
+                const icon = item.weather[0].icon;
+                const desc = item.weather[0].description;
+                if (!daily[date]) daily[date] = { min: temp, max: temp, icon: icon, desc: desc };
                 else {
                     if (temp < daily[date].min) daily[date].min = temp;
                     if (temp > daily[date].max) daily[date].max = temp;
@@ -208,8 +258,19 @@
             });
             return Object.entries(daily).slice(0, 5).map(([date, d]) => ({
                 date: new Date(date).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', weekday:'short'}),
-                ...d
+                min: d.min,
+                max: d.max,
+                icon: mapIcon(d.icon),
+                desc: d.desc
             }));
+        }
+
+        function mapIcon(code) {
+            const icons = {
+                '01d':'☀️','01n':'🌙','02d':'⛅','02n':'🌙','03d':'☁','03n':'☁','04d':'☁','04n':'☁',
+                '09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'🌨','13n':'🌨','50d':'🌫','50n':'🌫'
+            };
+            return icons[code] || '🌡';
         }
 
         async function getNews(city) {
@@ -248,20 +309,23 @@
 
         async function loadForecast() {
             const f = await getForecast(currentCity);
-            document.getElementById('forecastCard').innerHTML = f.map(d => `
-                <div class="forecast-item">
-                    <span>${d.date}</span>
-                    <span>${d.min.toFixed(0)}° … ${d.max.toFixed(0)}°</span>
-                    <span style="color:var(--sub)">${d.desc}</span>
-                </div>`).join('');
+            const html = f.map(d => `
+                <div class="forecast-card">
+                    <div class="forecast-date">${d.date}</div>
+                    <div class="forecast-icon">${d.icon}</div>
+                    <div class="forecast-temp">${d.min.toFixed(0)}° … ${d.max.toFixed(0)}°</div>
+                    <div class="forecast-desc">${d.desc}</div>
+                </div>
+            `).join('');
+            document.getElementById('forecastCard').innerHTML = `<div class="forecast-grid">${html}</div>`;
         }
 
         async function loadNews() {
             const n = await getNews(currentCityRu);
             document.getElementById('newsCard').innerHTML = n.map(i => `
-                <div style="margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border);">
-                    <a href="${i.link}" target="_blank" style="color:var(--accent); text-decoration:none; font-weight:600;">${i.title}</a>
-                    <div style="font-size:12px; color:var(--sub);">${i.date || ''}</div>
+                <div class="news-item">
+                    <a href="${i.link}" target="_blank" class="news-link">${i.title}</a>
+                    <div class="news-date">${i.date || ''}</div>
                 </div>`).join('');
         }
 
@@ -315,8 +379,10 @@
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(`tab-${tab}`).classList.remove('hidden');
-            event.currentTarget.classList.add('active');
+            const tabEl = document.getElementById(`tab-${tab}`);
+            if (tabEl) tabEl.classList.remove('hidden');
+            const btn = document.querySelector(`.nav-btn[onclick*="switchTab('${tab}')"]`);
+            if (btn) btn.classList.add('active');
             if (tab === 'weather') loadWeather();
             else if (tab === 'forecast') loadForecast();
             else if (tab === 'news') loadNews();
@@ -324,7 +390,6 @@
             else if (tab === 'chart') loadChart();
         }
 
-        // При старте пробуем геолокацию
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(async pos => {
                 try {
