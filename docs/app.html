@@ -7,184 +7,519 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        :root {
-            --bg: #f5f7fa;
-            --card: #ffffff;
-            --text: #1a1a1a;
-            --sub: #6b7280;
-            --accent: #3b82f6;
-            --accent-light: #eff6ff;
-            --border: #e5e7eb;
-            --danger: #ef4444;
-            --tab-active: #3b82f6;
-            --tab-inactive: #9ca3af;
-            --shadow: 0 4px 12px rgba(0,0,0,0.04);
-            --radius: 20px;
-            --skeleton-base: #e5e7eb;
-            --skeleton-shine: #f3f4f6;
-        }
-        body.dark {
-            --bg: #111827;
-            --card: #1f2937;
-            --text: #f3f4f6;
-            --sub: #9ca3af;
-            --accent: #60a5fa;
-            --accent-light: #1e3a5f;
-            --border: #374151;
-            --shadow: 0 4px 12px rgba(0,0,0,0.3);
-            --skeleton-base: #374151;
-            --skeleton-shine: #4b5563;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            padding-bottom: 80px;
-            transition: background 0.3s, color 0.3s;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 20px 10px;
-        }
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-        }
-        .city-select-btn {
-            background: var(--accent-light);
-            color: var(--accent);
-            border: none;
-            padding: 10px 18px;
-            border-radius: 14px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .city-select-btn:active { background: var(--accent); color: white; }
-        .card {
-            background: var(--card); border-radius: var(--radius); padding: 18px; margin: 0 16px 12px; box-shadow: var(--shadow);
-            transition: all 0.3s;
-        }
-        .weather-icon { font-size: 48px; margin-right: 12px; }
-        .temp-big { font-size: 42px; font-weight: 700; }
-        .feels { color: var(--sub); font-size: 14px; }
-        .row { display: flex; align-items: center; flex-wrap: wrap; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .detail { font-size: 14px; color: var(--sub); }
-        .detail b { color: var(--text); font-weight: 600; }
-        .nav {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: var(--card); border-top: 1px solid var(--border);
-            display: flex; justify-content: space-around; padding: 8px 0 12px;
-            backdrop-filter: blur(12px); transition: background 0.3s;
-        }
-        .nav-btn {
-            background: none; border: none; color: var(--tab-inactive);
-            font-size: 11px; display: flex; flex-direction: column; align-items: center;
-            gap: 4px; cursor: pointer; transition: color 0.2s; padding: 4px 8px;
-        }
-        .nav-btn.active { color: var(--tab-active); font-weight: 600; }
-        .nav-btn svg { width: 24px; height: 24px; }
+:root {
+    --bg:#f4f6fb;
+    --card:#ffffff;
+    --text:#111827;
+    --sub:#6b7280;
+    --accent:#2563eb;
+    --accent-light:#eaf2ff;
+    --border:#e5e7eb;
+    --danger:#ef4444;
+    --shadow:0 8px 25px rgba(0,0,0,.06);
+    --radius:26px;
+}
 
-        .hourly-scroll {
-            display: flex; overflow-x: auto; gap: 12px; padding-bottom: 8px; margin-top: 12px;
-            -webkit-overflow-scrolling: touch;
-        }
-        .hourly-item {
-            min-width: 70px; text-align: center; padding: 8px 6px; border-radius: 12px;
-            background: var(--accent-light); flex-shrink: 0;
-        }
-        .hourly-time { font-size: 13px; color: var(--sub); margin-bottom: 4px; }
-        .hourly-icon { font-size: 24px; }
-        .hourly-temp { font-weight: 600; margin-top: 4px; }
+body.dark {
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#f8fafc;
+    --sub:#94a3b8;
+    --accent:#60a5fa;
+    --accent-light:#1e3a5f;
+    --border:#334155;
+    --shadow:0 8px 25px rgba(0,0,0,.35);
+}
 
-        .forecast-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 10px;
-        }
-        .forecast-card {
-            background: var(--card); border-radius: 16px; padding: 14px; text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border);
-            cursor: pointer; transition: transform 0.15s;
-        }
-        .forecast-card:active { transform: scale(0.97); }
-        .forecast-date { font-size: 13px; color: var(--sub); margin-bottom: 6px; }
-        .forecast-icon { font-size: 32px; margin: 4px 0; }
-        .forecast-temp { font-size: 18px; font-weight: 700; margin: 4px 0; }
-        .forecast-desc { font-size: 12px; color: var(--sub); text-transform: capitalize; }
 
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5); display: flex; align-items: flex-end; justify-content: center;
-            z-index: 1000; animation: fadeIn 0.2s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; } }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } }
-        .tab-content.active { animation: fadeInUp 0.25s ease; }
-        .modal {
-            background: var(--card); border-radius: 24px 24px 0 0; padding: 24px 20px 30px;
-            width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto;
-            box-shadow: 0 -8px 30px rgba(0,0,0,0.15);
-        }
-        .modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
-        .modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 16px; }
-        .city-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-        .city-card {
-            background: var(--bg); border-radius: 14px; padding: 14px; text-align: center;
-            cursor: pointer; transition: background 0.15s; border: 1px solid transparent;
-        }
-        .city-card:active { background: var(--accent-light); border-color: var(--accent); }
-        .city-flag { font-size: 28px; margin-bottom: 4px; }
-        .city-name { font-weight: 600; font-size: 16px; }
-        .search-box {
-            width: 100%; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--border);
-            background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 12px; outline: none;
-        }
-        .search-box:focus { border-color: var(--accent); }
+* {
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
 
-        .rate-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-        .rate-table th, .rate-table td { padding: 6px 4px; text-align: right; }
-        .rate-table th { color: var(--sub); font-weight: 500; border-bottom: 1px solid var(--border); }
-        .rate-table td:first-child, .rate-table th:first-child { text-align: left; }
-        .refresh-btn {
-            background: none; border: 1px solid var(--border); color: var(--text);
-            padding: 4px 12px; border-radius: 8px; font-size: 13px; cursor: pointer;
-            margin-bottom: 8px; display: inline-flex; align-items: center; gap: 4px;
-        }
-        .converter { display: flex; flex-direction: column; gap: 8px; }
-        .converter input, .converter select, .converter button {
-            padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
-            background: var(--bg); color: var(--text); font-size: 15px;
-        }
-        .converter button { background: var(--accent); color: white; border: none; font-weight: 600; cursor: pointer; }
-        .swap-btn {
-            background: var(--accent-light); color: var(--accent); border: none;
-            width: 40px; height: 40px; border-radius: 20px; font-size: 20px;
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
-            margin: 0 auto; transition: transform 0.2s;
-        }
-        .swap-btn:active { transform: rotate(180deg); }
-        .hidden { display: none !important; }
-        .history-item { padding: 6px 0; font-size: 14px; border-bottom: 1px solid var(--border); }
-        .history-item:last-child { border-bottom: none; }
-        .clear-history-btn { background: none; border: none; color: var(--danger); font-size: 13px; cursor: pointer; padding: 4px 8px; margin-top: 8px; }
-        
-        .skeleton {
-            background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-            border-radius: 8px;
-        }
-        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+body {
+    font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Display",
+    "Segoe UI",
+    sans-serif;
+
+    background:var(--bg);
+    color:var(--text);
+
+    min-height:100vh;
+    padding-bottom:90px;
+
+    transition:.3s;
+}
+
+
+
+/* HEADER */
+
+.header {
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    padding:22px 18px 14px;
+
+}
+
+
+.header h1 {
+
+    font-size:24px;
+    font-weight:750;
+    letter-spacing:-.5px;
+
+}
+
+
+
+.city-select-btn {
+
+    background:var(--accent-light);
+
+    color:var(--accent);
+
+    border:none;
+
+    padding:10px 15px;
+
+    border-radius:16px;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+
+
+/* CARDS */
+
+
+.card {
+
+    background:var(--card);
+
+    border-radius:var(--radius);
+
+    padding:20px;
+
+    margin:0 16px 14px;
+
+    box-shadow:var(--shadow);
+
+    transition:.25s;
+
+}
+
+
+
+
+/* WEATHER */
+
+
+.weather-main {
+
+    text-align:center;
+
+}
+
+
+.weather-icon {
+
+    font-size:75px;
+
+    margin-bottom:5px;
+
+}
+
+
+.temp-big {
+
+    font-size:70px;
+
+    font-weight:750;
+
+    letter-spacing:-3px;
+
+    line-height:1;
+
+}
+
+
+.feels {
+
+    margin-top:8px;
+
+    color:var(--sub);
+
+}
+
+
+.weather-desc {
+
+    font-size:20px;
+
+    color:var(--sub);
+
+    margin-top:5px;
+
+}
+
+
+
+.grid-2 {
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:12px;
+
+    margin-top:22px;
+
+}
+
+
+
+.detail {
+
+    background:var(--accent-light);
+
+    padding:13px;
+
+    border-radius:18px;
+
+    text-align:center;
+
+    color:var(--sub);
+
+}
+
+
+
+.detail b {
+
+    display:block;
+
+    margin-top:5px;
+
+    font-size:16px;
+
+    color:var(--text);
+
+}
+
+
+
+/* HOURLY */
+
+
+.hourly-scroll {
+
+    display:flex;
+
+    gap:12px;
+
+    overflow-x:auto;
+
+    padding-bottom:5px;
+
+}
+
+
+
+.hourly-item {
+
+    min-width:75px;
+
+    background:var(--accent-light);
+
+    border-radius:18px;
+
+    padding:12px 8px;
+
+    text-align:center;
+
+}
+
+
+
+.hourly-icon {
+
+    font-size:28px;
+
+}
+
+
+
+/* FORECAST */
+
+
+.forecast-grid {
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:12px;
+
+}
+
+
+.forecast-card {
+
+    background:var(--card);
+
+    border:1px solid var(--border);
+
+    border-radius:22px;
+
+    padding:16px;
+
+    text-align:center;
+
+}
+
+
+
+.forecast-icon {
+
+    font-size:36px;
+
+}
+
+
+
+.forecast-temp {
+
+    font-size:20px;
+
+    font-weight:700;
+
+}
+
+
+
+
+/* NAV */
+
+
+.nav {
+
+    position:fixed;
+
+    bottom:0;
+
+    left:0;
+
+    right:0;
+
+
+    background:var(--card);
+
+    border-top:1px solid var(--border);
+
+
+    display:flex;
+
+    justify-content:space-around;
+
+
+    padding:10px 0 14px;
+
+
+    backdrop-filter:blur(20px);
+
+}
+
+
+
+.nav-btn {
+
+    background:none;
+
+    border:none;
+
+    color:#9ca3af;
+
+    font-size:11px;
+
+}
+
+
+
+.nav-btn.active {
+
+    color:var(--accent);
+
+    font-weight:700;
+
+}
+
+
+
+/* MODAL */
+
+
+.modal-overlay {
+
+    position:fixed;
+
+    inset:0;
+
+    background:rgba(0,0,0,.45);
+
+    display:flex;
+
+    align-items:flex-end;
+
+    z-index:1000;
+
+}
+
+
+
+.modal {
+
+    width:100%;
+
+    max-width:500px;
+
+    background:var(--card);
+
+    border-radius:30px 30px 0 0;
+
+    padding:25px;
+
+    max-height:80vh;
+
+    overflow:auto;
+
+}
+
+
+
+.city-grid {
+
+    display:grid;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:12px;
+
+}
+
+
+
+.city-card {
+
+    background:var(--bg);
+
+    border-radius:20px;
+
+    padding:16px;
+
+    text-align:center;
+
+}
+
+
+
+.city-flag {
+
+    font-size:30px;
+
+}
+
+
+
+/* INPUTS */
+
+
+.search-box,
+.converter input,
+.converter select {
+
+    width:100%;
+
+    padding:14px;
+
+    border-radius:16px;
+
+    border:1px solid var(--border);
+
+    background:var(--bg);
+
+    color:var(--text);
+
+    font-size:16px;
+
+}
+
+
+
+
+.converter button {
+
+    padding:14px;
+
+    border-radius:18px;
+
+    border:none;
+
+    background:var(--accent);
+
+    color:white;
+
+    font-weight:700;
+
+    font-size:16px;
+
+}
+
+
+
+
+/* SKELETON */
+
+
+.skeleton {
+
+background:
+linear-gradient(
+90deg,
+var(--border),
+var(--card),
+var(--border)
+);
+
+background-size:200% 100%;
+
+animation:loading 1.5s infinite;
+
+}
+
+
+@keyframes loading {
+
+0%{
+background-position:200% 0;
+}
+
+100%{
+background-position:-200% 0;
+}
+
+}
     </style>
 </head>
 <body>
@@ -213,21 +548,120 @@
         </div>
     </div>
 
-    <div class="header">
-        <h1 id="cityTitle">🏙 Загрузка...</h1>
-        <button class="city-select-btn" onclick="openCityModal()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-            Выбрать город
-        </button>
-    </div>
+<div class="header">
+
+    <h1 id="cityTitle">
+        📍 Загрузка...
+    </h1>
+
+
+    <button class="city-select-btn" onclick="openCityModal()">
+
+        📍 Город
+
+    </button>
+
+</div>
 
     <!-- Вкладки -->
     <div id="tab-weather" class="tab-content active">
-        <div class="card" id="weatherCard"><div class="skeleton" style="height:120px;"></div></div>
-        <div class="card" id="hourlyCard" style="margin-top:0;"><div id="hourlyForecast"></div></div>
+        <div class="card" id="weatherCard">
+
+    <div class="weather-main">
+
+        <div class="weather-icon">
+            🌤️
+        </div>
+
+
+        <div class="temp-big">
+            --
+        </div>
+
+
+        <div class="weather-desc">
+            Загрузка...
+        </div>
+
+
+        <div class="feels">
+            Ощущается --
+        </div>
+
+
+        <div class="grid-2">
+
+
+            <div class="detail">
+                💧 Влажность
+                <b>--%</b>
+            </div>
+
+
+            <div class="detail">
+                💨 Ветер
+                <b>-- м/с</b>
+            </div>
+
+
+            <div class="detail">
+                🌅 Восход
+                <b>--:--</b>
+            </div>
+
+
+            <div class="detail">
+                🌇 Закат
+                <b>--:--</b>
+            </div>
+
+
+        </div>
+
+
+    </div>
+
+
+</div>
+        <div class="card" id="hourlyCard">
+
+    <div style="
+        font-size:18px;
+        font-weight:700;
+        margin-bottom:12px;
+    ">
+        🕒 Сегодня
+    </div>
+
+
+    <div id="hourlyForecast">
+
+    </div>
+
+
+</div>
     </div>
     <div id="tab-forecast" class="tab-content hidden">
-        <div class="card"><div id="forecastCard"><div class="skeleton" style="height:200px;"></div></div></div>
+       <div class="card">
+
+    <h2 style="
+    margin-bottom:15px;
+    font-size:20px;
+    ">
+        📅 Прогноз
+    </h2>
+
+
+    <div id="forecastCard">
+
+        <div class="forecast-grid">
+
+        </div>
+
+    </div>
+
+
+</div>
     </div>
     <div id="tab-rates" class="tab-content hidden">
         <div class="card">
