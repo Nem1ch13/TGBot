@@ -1,898 +1,940 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Всё под рукой</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <style>
-:root {
-    --bg:#f4f6fb;
-    --card:#ffffff;
-    --text:#111827;
-    --sub:#6b7280;
-    --accent:#2563eb;
-    --accent-light:#eaf2ff;
-    --border:#e5e7eb;
-    --danger:#ef4444;
-    --shadow:0 8px 25px rgba(0,0,0,.06);
-    --radius:26px;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+
+<title>Всё под рукой</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+:root{
+--bg:#f2f4f8;
+--card:#fff;
+--text:#111827;
+--sub:#6b7280;
+--accent:#2563eb;
+--accent-light:#e8f0ff;
+--border:#e5e7eb;
+--shadow:0 8px 30px rgba(0,0,0,.07);
+--radius:24px
 }
 
-body.dark {
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#f8fafc;
-    --sub:#94a3b8;
-    --accent:#60a5fa;
-    --accent-light:#1e3a5f;
-    --border:#334155;
-    --shadow:0 8px 25px rgba(0,0,0,.35);
+body.dark{
+--bg:#0f172a;
+--card:#1e293b;
+--text:#f8fafc;
+--sub:#94a3b8;
+--accent:#60a5fa;
+--accent-light:#1e3a5f;
+--border:#334155;
+--shadow:0 8px 30px rgba(0,0,0,.35)
+}
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box
+}
+
+body{
+font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;
+background:var(--bg);
+color:var(--text);
+min-height:100vh;
+padding-bottom:90px;
+transition:.25s
+}
+
+.hidden{
+display:none!important
+}
+
+.header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:20px 18px
+}
+
+.header h1{
+font-size:24px;
+font-weight:800;
+letter-spacing:-.5px
+}
+
+.city-btn{
+border:0;
+background:var(--accent-light);
+color:var(--accent);
+padding:11px 16px;
+border-radius:18px;
+font-weight:700
+}
+
+.card{
+background:var(--card);
+margin:0 16px 16px;
+padding:20px;
+border-radius:var(--radius);
+box-shadow:var(--shadow)
+}
+
+.weather-main{
+text-align:center
+}
+
+.weather-icon{
+font-size:70px
+}
+
+.temperature{
+font-size:68px;
+font-weight:800;
+letter-spacing:-3px
+}
+
+.description{
+font-size:20px;
+color:var(--sub);
+margin-top:5px
+}
+
+.feels{
+color:var(--sub);
+margin-top:8px
+}
+
+.weather-grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+margin-top:22px
+}
+
+.info-box{
+background:var(--accent-light);
+padding:14px;
+border-radius:18px;
+text-align:center;
+color:var(--sub)
+}
+
+.info-box b{
+display:block;
+margin-top:5px;
+font-size:17px;
+color:var(--text)
+}
+
+.hourly{
+display:flex;
+gap:12px;
+overflow-x:auto;
+margin-top:15px
+}
+
+.hour{
+min-width:75px;
+background:var(--accent-light);
+border-radius:18px;
+padding:12px;
+text-align:center
+}
+
+.forecast{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+margin-top:15px
+}
+
+.forecast-box{
+border:1px solid var(--border);
+border-radius:22px;
+padding:15px;
+text-align:center
+}
+
+.forecast-box div{
+font-size:35px;
+margin:10px
+}
+
+.input,
+.search{
+width:100%;
+padding:14px;
+margin-top:10px;
+border-radius:16px;
+border:1px solid var(--border);
+background:var(--bg);
+color:var(--text);
+font-size:16px
+}
+
+.main-btn,
+.swap{
+width:100%;
+margin-top:10px;
+padding:15px;
+border:0;
+border-radius:18px;
+background:var(--accent);
+color:white;
+font-weight:800;
+font-size:16px
+}
+
+.nav{
+position:fixed;
+bottom:0;
+left:0;
+right:0;
+background:var(--card);
+border-top:1px solid var(--border);
+display:flex;
+justify-content:space-around;
+padding:10px 0 14px;
+backdrop-filter:blur(20px)
+}
+
+.nav button{
+background:none;
+border:0;
+color:#9ca3af;
+font-size:12px
+}
+
+.nav button.active{
+color:var(--accent);
+font-weight:800
+}
+
+.modal{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.45);
+display:flex;
+align-items:flex-end;
+z-index:1000
+}
+
+.modal-box{
+background:var(--card);
+width:100%;
+border-radius:30px 30px 0 0;
+padding:25px;
+max-height:80vh;
+overflow:auto
+}
+
+.cities{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:12px;
+margin-top:15px
+}
+
+.cities button{
+border:0;
+background:var(--bg);
+padding:16px;
+border-radius:20px;
+font-size:15px
+}
+
+.close-btn{
+width:100%;
+margin-top:15px;
+padding:15px;
+border:0;
+border-radius:18px;
+background:#ef4444;
+color:white
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="cityModal" class="modal hidden">
+<div class="modal-box">
+
+<h2>🌍 Выбор города</h2>
+
+<input id="citySearch" class="search" placeholder="Введите город">
+
+<div class="cities">
+
+<button onclick="selectCity('Almetyevsk','Альметьевск')">
+🇷🇺 Альметьевск
+</button>
+
+<button onclick="selectCity('Moscow','Москва')">
+🇷🇺 Москва
+</button>
+
+<button onclick="selectCity('Kazan','Казань')">
+🇷🇺 Казань
+</button>
+
+<button onclick="selectCity('Almaty','Алматы')">
+🇰🇿 Алматы
+</button>
+
+</div>
+
+<button class="close-btn" onclick="closeCity()">
+Закрыть
+</button>
+
+</div>
+</div>
+
+
+<header class="header">
+
+<h1 id="cityName">
+📍 Загрузка...
+</h1>
+
+<button class="city-btn" onclick="openCity()">
+🌍 Город
+</button>
+
+</header>
+
+
+<section id="weatherTab">
+
+<div class="card weather-main">
+
+<div id="weatherIcon" class="weather-icon">
+🌤
+</div>
+
+<div id="temperature" class="temperature">
+--
+</div>
+
+<div id="description" class="description">
+Загрузка...
+</div>
+
+<div id="feels" class="feels">
+Ощущается --
+</div>
+
+
+<div class="weather-grid">
+
+<div class="info-box">
+💧 Влажность
+<b id="humidity">--</b>
+</div>
+
+<div class="info-box">
+💨 Ветер
+<b id="wind">--</b>
+</div>
+
+<div class="info-box">
+🌅 Восход
+<b id="sunrise">--</b>
+</div>
+
+<div class="info-box">
+🌇 Закат
+<b id="sunset">--</b>
+</div>
+
+</div>
+
+</div>
+
+
+<div class="card">
+
+<h2>🕒 Сегодня</h2>
+
+<div id="hourly" class="hourly"></div>
+
+</div>
+
+</section>
+
+
+<section id="forecastTab" class="hidden">
+
+<div class="card">
+
+<h2>📅 Прогноз</h2>
+
+<div id="forecast" class="forecast"></div>
+
+</div>
+
+</section>
+<section id="ratesTab" class="hidden">
+
+<div class="card">
+
+<h2>💵 Курсы валют</h2>
+
+<button class="main-btn" onclick="loadRates()">
+Обновить
+</button>
+
+<div id="rates">
+Загрузка...
+</div>
+
+</div>
+
+</section>
+
+
+
+<section id="convertTab" class="hidden">
+
+<div class="card">
+
+<h2>💱 Конвертер</h2>
+
+<input id="amount" class="input" type="number" value="100">
+
+
+<select id="from" class="input">
+
+<option value="RUB">🇷🇺 RUB</option>
+<option value="USD">🇺🇸 USD</option>
+<option value="EUR">🇪🇺 EUR</option>
+<option value="KZT">🇰🇿 KZT</option>
+
+</select>
+
+
+<button class="swap" onclick="swap()">
+↕ Поменять
+</button>
+
+
+<select id="to" class="input">
+
+<option value="USD">🇺🇸 USD</option>
+<option value="RUB">🇷🇺 RUB</option>
+<option value="EUR">🇪🇺 EUR</option>
+<option value="KZT">🇰🇿 KZT</option>
+
+</select>
+
+
+<button class="main-btn" onclick="convert()">
+Конвертировать
+</button>
+
+
+<h3 id="result"></h3>
+
+
+</div>
+
+</section>
+
+
+
+<nav class="nav">
+
+<button onclick="switchTab('weather')">
+☀️<br>Погода
+</button>
+
+<button onclick="switchTab('forecast')">
+📅<br>Прогноз
+</button>
+
+<button onclick="switchTab('rates')">
+💵<br>Курсы
+</button>
+
+<button onclick="switchTab('convert')">
+💱<br>Обмен
+</button>
+
+</nav>
+
+
+
+<script>
+
+const WEATHER_KEY="b87ebb55d538c2d9213edfad793e6bef";
+
+let city=localStorage.getItem("city")||"Almetyevsk";
+let cityRu=localStorage.getItem("cityRu")||"Альметьевск";
+
+
+const tg=window.Telegram.WebApp;
+
+tg.ready();
+tg.expand();
+
+
+
+function theme(){
+
+if(tg.colorScheme==="dark")
+document.body.classList.add("dark");
+
+else
+document.body.classList.remove("dark");
+
+}
+
+theme();
+
+tg.onEvent("themeChanged",theme);
+
+
+
+
+
+function weatherIcon(code){
+
+let icons={
+
+"01d":"☀️",
+"01n":"🌙",
+"02d":"⛅",
+"02n":"☁️",
+"03d":"☁️",
+"03n":"☁️",
+"04d":"☁️",
+"04n":"☁️",
+"09d":"🌧",
+"10d":"🌦",
+"11d":"⛈",
+"13d":"❄️",
+"50d":"🌫"
+
+};
+
+return icons[code]||"🌡";
+
 }
 
 
-* {
-    margin:0;
-    padding:0;
-    box-sizing:border-box;
-}
 
 
-body {
-    font-family:
-    -apple-system,
-    BlinkMacSystemFont,
-    "SF Pro Display",
-    "Segoe UI",
-    sans-serif;
 
-    background:var(--bg);
-    color:var(--text);
 
-    min-height:100vh;
-    padding-bottom:90px;
+async function loadWeather(){
 
-    transition:.3s;
-}
+try{
 
 
+let r=await fetch(
 
-/* HEADER */
+`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`
 
-.header {
-
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-
-    padding:22px 18px 14px;
-
-}
-
-
-.header h1 {
-
-    font-size:24px;
-    font-weight:750;
-    letter-spacing:-.5px;
-
-}
-
-
-
-.city-select-btn {
-
-    background:var(--accent-light);
-
-    color:var(--accent);
-
-    border:none;
-
-    padding:10px 15px;
-
-    border-radius:16px;
-
-    font-size:14px;
-
-    font-weight:600;
-
-}
-
-
-
-/* CARDS */
-
-
-.card {
-
-    background:var(--card);
-
-    border-radius:var(--radius);
-
-    padding:20px;
-
-    margin:0 16px 14px;
-
-    box-shadow:var(--shadow);
-
-    transition:.25s;
-
-}
-
-
-
-
-/* WEATHER */
-
-
-.weather-main {
-
-    text-align:center;
-
-}
-
-
-.weather-icon {
-
-    font-size:75px;
-
-    margin-bottom:5px;
-
-}
-
-
-.temp-big {
-
-    font-size:70px;
-
-    font-weight:750;
-
-    letter-spacing:-3px;
-
-    line-height:1;
-
-}
-
-
-.feels {
-
-    margin-top:8px;
-
-    color:var(--sub);
-
-}
-
-
-.weather-desc {
-
-    font-size:20px;
-
-    color:var(--sub);
-
-    margin-top:5px;
-
-}
-
-
-
-.grid-2 {
-
-    display:grid;
-
-    grid-template-columns:1fr 1fr;
-
-    gap:12px;
-
-    margin-top:22px;
-
-}
-
-
-
-.detail {
-
-    background:var(--accent-light);
-
-    padding:13px;
-
-    border-radius:18px;
-
-    text-align:center;
-
-    color:var(--sub);
-
-}
-
-
-
-.detail b {
-
-    display:block;
-
-    margin-top:5px;
-
-    font-size:16px;
-
-    color:var(--text);
-
-}
-
-
-
-/* HOURLY */
-
-
-.hourly-scroll {
-
-    display:flex;
-
-    gap:12px;
-
-    overflow-x:auto;
-
-    padding-bottom:5px;
-
-}
-
-
-
-.hourly-item {
-
-    min-width:75px;
-
-    background:var(--accent-light);
-
-    border-radius:18px;
-
-    padding:12px 8px;
-
-    text-align:center;
-
-}
-
-
-
-.hourly-icon {
-
-    font-size:28px;
-
-}
-
-
-
-/* FORECAST */
-
-
-.forecast-grid {
-
-    display:grid;
-
-    grid-template-columns:1fr 1fr;
-
-    gap:12px;
-
-}
-
-
-.forecast-card {
-
-    background:var(--card);
-
-    border:1px solid var(--border);
-
-    border-radius:22px;
-
-    padding:16px;
-
-    text-align:center;
-
-}
-
-
-
-.forecast-icon {
-
-    font-size:36px;
-
-}
-
-
-
-.forecast-temp {
-
-    font-size:20px;
-
-    font-weight:700;
-
-}
-
-
-
-
-/* NAV */
-
-
-.nav {
-
-    position:fixed;
-
-    bottom:0;
-
-    left:0;
-
-    right:0;
-
-
-    background:var(--card);
-
-    border-top:1px solid var(--border);
-
-
-    display:flex;
-
-    justify-content:space-around;
-
-
-    padding:10px 0 14px;
-
-
-    backdrop-filter:blur(20px);
-
-}
-
-
-
-.nav-btn {
-
-    background:none;
-
-    border:none;
-
-    color:#9ca3af;
-
-    font-size:11px;
-
-}
-
-
-
-.nav-btn.active {
-
-    color:var(--accent);
-
-    font-weight:700;
-
-}
-
-
-
-/* MODAL */
-
-
-.modal-overlay {
-
-    position:fixed;
-
-    inset:0;
-
-    background:rgba(0,0,0,.45);
-
-    display:flex;
-
-    align-items:flex-end;
-
-    z-index:1000;
-
-}
-
-
-
-.modal {
-
-    width:100%;
-
-    max-width:500px;
-
-    background:var(--card);
-
-    border-radius:30px 30px 0 0;
-
-    padding:25px;
-
-    max-height:80vh;
-
-    overflow:auto;
-
-}
-
-
-
-.city-grid {
-
-    display:grid;
-
-    grid-template-columns:1fr 1fr;
-
-    gap:12px;
-
-}
-
-
-
-.city-card {
-
-    background:var(--bg);
-
-    border-radius:20px;
-
-    padding:16px;
-
-    text-align:center;
-
-}
-
-
-
-.city-flag {
-
-    font-size:30px;
-
-}
-
-
-
-/* INPUTS */
-
-
-.search-box,
-.converter input,
-.converter select {
-
-    width:100%;
-
-    padding:14px;
-
-    border-radius:16px;
-
-    border:1px solid var(--border);
-
-    background:var(--bg);
-
-    color:var(--text);
-
-    font-size:16px;
-
-}
-
-
-
-
-.converter button {
-
-    padding:14px;
-
-    border-radius:18px;
-
-    border:none;
-
-    background:var(--accent);
-
-    color:white;
-
-    font-weight:700;
-
-    font-size:16px;
-
-}
-
-
-
-
-/* SKELETON */
-
-
-.skeleton {
-
-background:
-linear-gradient(
-90deg,
-var(--border),
-var(--card),
-var(--border)
 );
 
-background-size:200% 100%;
 
-animation:loading 1.5s infinite;
+let d=await r.json();
+
+
+document.getElementById("cityName").innerHTML=
+"📍 "+cityRu;
+
+
+document.getElementById("weatherIcon").innerHTML=
+weatherIcon(d.weather[0].icon);
+
+
+document.getElementById("temperature").innerHTML=
+Math.round(d.main.temp)+"°";
+
+
+document.getElementById("description").innerHTML=
+d.weather[0].description;
+
+
+document.getElementById("feels").innerHTML=
+"Ощущается "+Math.round(d.main.feels_like)+"°";
+
+
+document.getElementById("humidity").innerHTML=
+d.main.humidity+"%";
+
+
+document.getElementById("wind").innerHTML=
+d.wind.speed+" м/с";
+
+
+document.getElementById("sunrise").innerHTML=
+new Date(d.sys.sunrise*1000)
+.toLocaleTimeString("ru-RU",
+{hour:"2-digit",minute:"2-digit"});
+
+
+document.getElementById("sunset").innerHTML=
+new Date(d.sys.sunset*1000)
+.toLocaleTimeString("ru-RU",
+{hour:"2-digit",minute:"2-digit"});
+
+
+loadHourly();
+
+
+}
+
+catch(e){
+
+console.log(e);
+
+}
 
 }
 
 
-@keyframes loading {
 
-0%{
-background-position:200% 0;
+
+
+
+async function loadHourly(){
+
+let r=await fetch(
+
+`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`
+
+);
+
+
+let d=await r.json();
+
+let html="";
+
+
+d.list.slice(0,8).forEach(x=>{
+
+html+=`
+
+<div class="hour">
+
+<b>${x.dt_txt.slice(11,16)}</b>
+
+<br>
+
+${weatherIcon(x.weather[0].icon)}
+
+<br>
+
+${Math.round(x.main.temp)}°
+
+</div>
+
+`;
+
+});
+
+
+document.getElementById("hourly").innerHTML=html;
+
 }
 
-100%{
-background-position:-200% 0;
+
+
+
+
+
+
+async function loadForecast(){
+
+let r=await fetch(
+
+`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`
+
+);
+
+
+let d=await r.json();
+
+let days={};
+
+
+
+d.list.forEach(x=>{
+
+let date=x.dt_txt.split(" ")[0];
+
+if(!days[date])
+days[date]=x;
+
+});
+
+
+let html="";
+
+
+Object.values(days)
+.slice(0,5)
+.forEach(x=>{
+
+
+html+=`
+
+<div class="forecast-box">
+
+<h3>
+
+${new Date(x.dt*1000)
+.toLocaleDateString("ru-RU",
+{
+weekday:"short",
+day:"numeric",
+month:"short"
+})}
+
+</h3>
+
+
+<div>
+${weatherIcon(x.weather[0].icon)}
+</div>
+
+
+<b>
+${Math.round(x.main.temp)}°
+</b>
+
+
+<p>
+${x.weather[0].description}
+</p>
+
+
+</div>
+
+`;
+
+});
+
+
+document.getElementById("forecast").innerHTML=html;
+
+}
+    async function loadRates(){
+
+try{
+
+let r=await fetch(
+"https://api.exchangerate-api.com/v4/latest/USD"
+);
+
+let d=await r.json();
+
+
+document.getElementById("rates").innerHTML=`
+
+<p>🇷🇺 RUB: ${d.rates.RUB.toFixed(2)}</p>
+<p>🇰🇿 KZT: ${d.rates.KZT.toFixed(2)}</p>
+<p>🇪🇺 EUR: ${d.rates.EUR.toFixed(2)}</p>
+<p>🇬🇧 GBP: ${d.rates.GBP.toFixed(2)}</p>
+<p>🇨🇳 CNY: ${d.rates.CNY.toFixed(2)}</p>
+
+`;
+
+}catch(e){
+
+document.getElementById("rates").innerHTML=
+"Ошибка загрузки валют";
+
 }
 
 }
-    </style>
-</head>
-<body>
-    <!-- Модальное окно выбора города -->
-    <div id="cityModal" class="modal-overlay hidden">
-        <div class="modal">
-            <div class="modal-handle"></div>
-            <h3>🌍 Выберите город</h3>
-            <input type="text" id="citySearchInput" class="search-box" placeholder="Поиск города...">
-            <div class="city-grid">
-                <div class="city-card" onclick="selectCity('Almetyevsk', 'Альметьевск')"><div class="city-flag">🇷🇺</div><div class="city-name">Альметьевск</div></div>
-                <div class="city-card" onclick="selectCity('Shymkent', 'Шымкент')"><div class="city-flag">🇰🇿</div><div class="city-name">Шымкент</div></div>
-                <div class="city-card" onclick="selectCity('Moscow', 'Москва')"><div class="city-flag">🇷🇺</div><div class="city-name">Москва</div></div>
-                <div class="city-card" onclick="selectCity('Almaty', 'Алматы')"><div class="city-flag">🇰🇿</div><div class="city-name">Алматы</div></div>
-                <div class="city-card" onclick="selectCity('Astana', 'Астана')"><div class="city-flag">🇰🇿</div><div class="city-name">Астана</div></div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Модальное окно почасового прогноза дня -->
-    <div id="dayHourlyModal" class="modal-overlay hidden">
-        <div class="modal" style="border-radius: 24px; max-height: 70vh;">
-            <button class="modal-close" onclick="closeDayHourlyModal()">✕</button>
-            <h3 id="dayHourlyTitle">Почасовой прогноз</h3>
-            <div id="dayHourlyContent"></div>
-        </div>
-    </div>
 
-<div class="header">
 
-    <h1 id="cityTitle">
-        📍 Загрузка...
-    </h1>
 
 
-    <button class="city-select-btn" onclick="openCityModal()">
+async function convert(){
 
-        📍 Город
+let amount=
+Number(document.getElementById("amount").value);
 
-    </button>
 
-</div>
+let from=
+document.getElementById("from").value;
 
-    <!-- Вкладки -->
-    <div id="tab-weather" class="tab-content active">
-        <div class="card" id="weatherCard">
 
-    <div class="weather-main">
+let to=
+document.getElementById("to").value;
 
-        <div class="weather-icon">
-            🌤️
-        </div>
 
 
-        <div class="temp-big">
-            --
-        </div>
+if(!amount){
 
+document.getElementById("result").innerHTML=
+"Введите сумму";
 
-        <div class="weather-desc">
-            Загрузка...
-        </div>
+return;
 
+}
 
-        <div class="feels">
-            Ощущается --
-        </div>
 
 
-        <div class="grid-2">
+try{
 
 
-            <div class="detail">
-                💧 Влажность
-                <b>--%</b>
-            </div>
+let r=await fetch(
 
+`https://api.exchangerate-api.com/v4/latest/${from}`
 
-            <div class="detail">
-                💨 Ветер
-                <b>-- м/с</b>
-            </div>
+);
 
 
-            <div class="detail">
-                🌅 Восход
-                <b>--:--</b>
-            </div>
+let d=await r.json();
 
 
-            <div class="detail">
-                🌇 Закат
-                <b>--:--</b>
-            </div>
 
+let result=
+amount*d.rates[to];
 
-        </div>
 
 
-    </div>
+document.getElementById("result").innerHTML=
 
+`${amount} ${from} = ${result.toFixed(2)} ${to}`;
 
-</div>
-        <div class="card" id="hourlyCard">
-
-    <div style="
-        font-size:18px;
-        font-weight:700;
-        margin-bottom:12px;
-    ">
-        🕒 Сегодня
-    </div>
-
-
-    <div id="hourlyForecast">
-
-    </div>
-
-
-</div>
-    </div>
-    <div id="tab-forecast" class="tab-content hidden">
-       <div class="card">
-
-    <h2 style="
-    margin-bottom:15px;
-    font-size:20px;
-    ">
-        📅 Прогноз
-    </h2>
-
-
-    <div id="forecastCard">
-
-        <div class="forecast-grid">
-
-        </div>
-
-    </div>
-
-
-</div>
-    </div>
-    <div id="tab-rates" class="tab-content hidden">
-        <div class="card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="font-weight:600;">💵 Курсы валют</span>
-                <button class="refresh-btn" onclick="loadRates()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                    Обновить
-                </button>
-            </div>
-            <div id="ratesCard"><div class="skeleton" style="height:200px;"></div></div>
-        </div>
-    </div>
-    <div id="tab-convert" class="tab-content hidden">
-        <div class="card">
-            <div class="converter">
-                <input type="number" id="convertAmount" placeholder="Сумма" value="100">
-                <select id="convertFrom">
-                    <option value="RUB">🇷🇺 RUB - Рубль</option><option value="KZT">🇰🇿 KZT - Тенге</option><option value="USD">🇺🇸 USD - Доллар</option><option value="EUR">🇪🇺 EUR - Евро</option><option value="GBP">🇬🇧 GBP - Фунт</option><option value="PLN">🇵🇱 PLN - Злотый</option><option value="CNY">🇨🇳 CNY - Юань</option><option value="TRY">🇹🇷 TRY - Лира</option><option value="UAH">🇺🇦 UAH - Гривна</option>
-                </select>
-                <button class="swap-btn" onclick="swapCurrencies()">↕️</button>
-                <select id="convertTo">
-                    <option value="KZT">🇰🇿 KZT - Тенге</option><option value="RUB">🇷🇺 RUB - Рубль</option><option value="USD">🇺🇸 USD - Доллар</option><option value="EUR">🇪🇺 EUR - Евро</option><option value="GBP">🇬🇧 GBP - Фунт</option><option value="PLN">🇵🇱 PLN - Злотый</option><option value="CNY">🇨🇳 CNY - Юань</option><option value="TRY">🇹🇷 TRY - Лира</option><option value="UAH">🇺🇦 UAH - Гривна</option>
-                </select>
-                <button onclick="doConvert()">Конвертировать</button>
-                <div id="convertResult" style="font-weight:600; margin-top:4px;"></div>
-                <div id="historyContainer" style="margin-top:12px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Навигация -->
-    <div class="nav">
-        <button class="nav-btn active" onclick="switchTab('weather')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7 1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91 1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/></svg>Погода</button>
-        <button class="nav-btn" onclick="switchTab('forecast')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>Прогноз</button>
-        <button class="nav-btn" onclick="switchTab('rates')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Курсы</button>
-        <button class="nav-btn" onclick="switchTab('convert')"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1 1.05.82 1.87 2.65 1.87 1.96 0 2.4-.98 2.4-1.59 0-.83-.44-1.61-2.67-2.14-2.48-.6-4.18-1.62-4.18-3.67 0-1.72 1.39-2.84 3.11-3.21V4h2.67v1.95c1.86.45 2.79 1.86 2.85 3.39H14.3c-.05-1.11-.64-1.87-2.22-1.87-1.5 0-2.4.68-2.4 1.64 0 .84.65 1.39 2.67 1.91s4.18 1.39 4.18 3.91c-.01 1.83-1.38 2.83-3.12 3.16z"/></svg>Конвертер</button>
-    </div>
-
-    <script>
-        const WEATHER_KEY = 'b87ebb55d538c2d9213edfad793e6bef';
-        let currentCity = localStorage.getItem('city') || 'Almetyevsk';
-        let currentCityRu = localStorage.getItem('cityRu') || 'Альметьевск';
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        function applyTheme() {
-            if (tg.colorScheme === 'dark') document.body.classList.add('dark');
-            else document.body.classList.remove('dark');
-        }
-        tg.onEvent('themeChanged', applyTheme);
-        applyTheme();
-
-        function cacheGet(key, maxAgeMs = 15 * 60 * 1000) {
-            const raw = localStorage.getItem(key);
-            if (!raw) return null;
-            try {
-                const { data, ts } = JSON.parse(raw);
-                if (Date.now() - ts < maxAgeMs) return data;
-            } catch(e) {}
-            return null;
-        }
-        function cacheSet(key, data) {
-            localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() }));
-        }
-
-        async function fetchJSON(url) {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error('Network error');
-            return res.json();
-        }
-
-        async function getWeather(city) {
-            const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-            const emoji = {'01d':'☀️','01n':'🌙','02d':'⛅','02n':'🌙','03d':'☁','03n':'☁','04d':'☁','04n':'☁','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'🌨','13n':'🌨','50d':'🌫','50n':'🌫'}[data.weather[0].icon] || '🌡';
-            return { temp: data.main.temp, feels: data.main.feels_like, desc: data.weather[0].description, hum: data.main.humidity, wind: data.wind.speed, icon: emoji, sunrise: new Date(data.sys.sunrise * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}), sunset: new Date(data.sys.sunset * 1000).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) };
-        }
-
-        async function getForecast(city) {
-            const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-            const daily = {};
-            data.list.forEach(item => { const date = item.dt_txt.split(' ')[0]; const temp = item.main.temp; const icon = item.weather[0].icon; const desc = item.weather[0].description; if (!daily[date]) daily[date] = { min: temp, max: temp, icon: icon, desc: desc }; else { if (temp < daily[date].min) daily[date].min = temp; if (temp > daily[date].max) daily[date].max = temp; } });
-            return Object.entries(daily).slice(0, 5).map(([date, d]) => ({ date: date, dateStr: new Date(date).toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit', weekday:'short'}), min: d.min, max: d.max, icon: mapIcon(d.icon), desc: d.desc }));
-        }
-
-        async function getHourlyForDate(city, dateStr) {
-            const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${WEATHER_KEY}&units=metric&lang=ru`);
-            return data.list.filter(item => item.dt_txt.startsWith(dateStr)).map(item => ({ time: item.dt_txt.split(' ')[1].slice(0,5), temp: item.main.temp, icon: mapIcon(item.weather[0].icon), desc: item.weather[0].description }));
-        }
-
-        function mapIcon(code) { const icons = {'01d':'☀️','01n':'🌙','02d':'⛅','02n':'🌙','03d':'☁','03n':'☁','04d':'☁','04n':'☁','09d':'🌧','09n':'🌧','10d':'🌦','10n':'🌧','11d':'⛈','11n':'⛈','13d':'🌨','13n':'🌨','50d':'🌫','50n':'🌫'}; return icons[code] || '🌡'; }
-
-        async function getRatesData() {
-            const cacheKey = 'rates';
-            const cached = cacheGet(cacheKey);
-            if (cached) return cached;
-            const data = await fetchJSON('https://api.exchangerate-api.com/v4/latest/USD');
-            const r = data.rates;
-            const result = { RUB: r.RUB, KZT: r.KZT, EUR: r.EUR, GBP: r.GBP, CNY: r.CNY, AED: r.AED, TRY: r.TRY, UAH: r.UAH, KGS: r.KGS, UZS: r.UZS, PLN: r.PLN };
-            cacheSet(cacheKey, result);
-            return result;
-        }
-
-        async function loadWeather() {
-            const w = await getWeather(currentCity);
-            document.getElementById('cityTitle').innerHTML = `🏙 ${currentCityRu}`;
-            document.getElementById('weatherCard').innerHTML = `
-                <div class="row"><span class="weather-icon">${w.icon}</span><div><span class="temp-big">${w.temp.toFixed(0)}°C</span><div class="feels">Ощущается ${w.feels.toFixed(0)}°C</div></div></div>
-                <div style="margin-top:10px;">☁ ${w.desc}</div>
-                <div class="grid-2">
-                    <div class="detail">💧 Влажность<br><b>${w.hum}%</b></div>
-                    <div class="detail">💨 Ветер<br><b>${w.wind} м/с</b></div>
-                    <div class="detail">🌅 Восход<br><b>${w.sunrise}</b></div>
-                    <div class="detail">🌇 Закат<br><b>${w.sunset}</b></div>
-                </div>`;
-            const todayStr = new Date().toISOString().slice(0,10);
-            const hourly = await getHourlyForDate(currentCity, todayStr);
-            const hourlyHtml = hourly.map(h => `
-                <div class="hourly-item">
-                    <div class="hourly-time">${h.time}</div>
-                    <div class="hourly-icon">${h.icon}</div>
-                    <div class="hourly-temp">${h.temp.toFixed(0)}°</div>
-                </div>
-            `).join('');
-            document.getElementById('hourlyForecast').innerHTML = `
-                <div style="font-weight:600; margin-bottom:8px;">🕒 Почасовой прогноз</div>
-                <div class="hourly-scroll">${hourlyHtml}</div>`;
-        }
-
-        async function loadForecast() {
-            const f = await getForecast(currentCity);
-            const html = f.map(d => `
-                <div class="forecast-card" onclick="openDayHourly('${d.date}')">
-                    <div class="forecast-date">${d.dateStr}</div>
-                    <div class="forecast-icon">${d.icon}</div>
-                    <div class="forecast-temp">${d.min.toFixed(0)}° … ${d.max.toFixed(0)}°</div>
-                    <div class="forecast-desc">${d.desc}</div>
-                </div>
-            `).join('');
-            document.getElementById('forecastCard').innerHTML = `<div class="forecast-grid">${html}</div>`;
-        }
-
-        async function loadRates() {
-            const r = await getRatesData();
-            const safe = (a,b) => b? a/b : 0;
-            document.getElementById('ratesCard').innerHTML = `
-                <table class="rate-table">
-                    <tr><th>Валюта</th><th>USD</th><th>RUB</th><th>KZT</th></tr>
-                    <tr><td>🇷🇺 RUB</td><td>${(1/r.RUB).toFixed(4)}</td><td>1.0000</td><td>${(1/(r.RUB/r.KZT)).toFixed(2)}</td></tr>
-                    <tr><td>🇰🇿 KZT</td><td>${(1/r.KZT).toFixed(4)}</td><td>${safe(1, r.RUB/r.KZT).toFixed(4)}</td><td>1.0000</td></tr>
-                    <tr><td>🇺🇸 USD</td><td>1.0000</td><td>${r.RUB.toFixed(2)}</td><td>${r.KZT.toFixed(2)}</td></tr>
-                    <tr><td>🇪🇺 EUR</td><td>${r.EUR.toFixed(4)}</td><td>${safe(r.RUB, r.EUR).toFixed(2)}</td><td>${safe(r.KZT, r.EUR).toFixed(2)}</td></tr>
-                    <tr><td>🇬🇧 GBP</td><td>${r.GBP.toFixed(4)}</td><td>${safe(r.RUB, r.GBP).toFixed(2)}</td><td>${safe(r.KZT, r.GBP).toFixed(2)}</td></tr>
-                    <tr><td>🇨🇳 CNY</td><td>${r.CNY.toFixed(4)}</td><td>${safe(r.RUB, r.CNY).toFixed(2)}</td><td>${safe(r.KZT, r.CNY).toFixed(2)}</td></tr>
-                    <tr><td>🇦🇪 AED</td><td>${r.AED.toFixed(4)}</td><td>${safe(r.RUB, r.AED).toFixed(2)}</td><td>${safe(r.KZT, r.AED).toFixed(2)}</td></tr>
-                    <tr><td>🇹🇷 TRY</td><td>${r.TRY.toFixed(4)}</td><td>${safe(r.RUB, r.TRY).toFixed(2)}</td><td>${safe(r.KZT, r.TRY).toFixed(2)}</td></tr>
-                    <tr><td>🇺🇦 UAH</td><td>${r.UAH.toFixed(4)}</td><td>${safe(r.RUB, r.UAH).toFixed(2)}</td><td>${safe(r.KZT, r.UAH).toFixed(2)}</td></tr>
-                    <tr><td>🇰🇬 KGS</td><td>${r.KGS.toFixed(4)}</td><td>${safe(r.RUB, r.KGS).toFixed(2)}</td><td>${safe(r.KZT, r.KGS).toFixed(2)}</td></tr>
-                    <tr><td>🇺🇿 UZS</td><td>${r.UZS.toFixed(0)}</td><td>${safe(r.RUB, r.UZS).toFixed(0)}</td><td>${safe(r.KZT, r.UZS).toFixed(0)}</td></tr>
-                    <tr><td>🇵🇱 PLN</td><td>${(1/r.PLN).toFixed(4)}</td><td>${safe(r.RUB, r.PLN).toFixed(2)}</td><td>${safe(r.KZT, r.PLN).toFixed(2)}</td></tr>
-                </table>`;
-        }
-
-        function swapCurrencies() {
-            const from = document.getElementById('convertFrom');
-            const to = document.getElementById('convertTo');
-            const temp = from.value;
-            from.value = to.value;
-            to.value = temp;
-        }
-
-        function getHistory() { return JSON.parse(localStorage.getItem('convHistory') || '[]'); }
-        function addHistory(entry) { let history = getHistory(); history.unshift(entry); if (history.length > 5) history.pop(); localStorage.setItem('convHistory', JSON.stringify(history)); renderHistory(); }
-        function clearHistory() { localStorage.removeItem('convHistory'); renderHistory(); }
-        function renderHistory() {
-            const container = document.getElementById('historyContainer');
-            const history = getHistory();
-            if (history.length === 0) {
-                container.innerHTML = '<div style="color:var(--sub); font-size:14px;">История пуста</div>';
-                return;
-            }
-            let html = '<div style="font-weight:600; margin-bottom:6px;">📋 Последние конвертации:</div>';
-            history.forEach(item => html += `<div class="history-item"><span>${item}</span></div>`);
-            html += '<button class="clear-history-btn" onclick="clearHistory()">Очистить историю</button>';
-            container.innerHTML = html;
-        }
-
-        async function doConvert() {
-            const amount = +document.getElementById('convertAmount').value;
-            const from = document.getElementById('convertFrom').value;
-            const to = document.getElementById('convertTo').value;
-            if (!amount || amount <= 0) {
-                document.getElementById('convertResult').textContent = 'Введите положительную сумму';
-                return;
-            }
-            try {
-                const data = await fetchJSON(`https://api.exchangerate-api.com/v4/latest/${from}`);
-                const rate = data.rates[to];
-                const res = amount * rate;
-                const resultText = `${amount} ${from} = ${res.toFixed(2)} ${to}`;
-                document.getElementById('convertResult').textContent = resultText;
-                addHistory(resultText);
-            } catch(e) {
-                document.getElementById('convertResult').textContent = 'Ошибка конвертации';
-            }
-        }
-
-        function openCityModal() { document.getElementById('cityModal').classList.remove('hidden'); document.getElementById('citySearchInput').value = ''; document.getElementById('citySearchInput').focus(); }
-        function closeCityModal() { document.getElementById('cityModal').classList.add('hidden'); }
-        async function selectCity(eng, ru) { currentCity = eng; currentCityRu = ru; localStorage.setItem('city', currentCity); localStorage.setItem('cityRu', currentCityRu); closeCityModal(); const activeTab = document.querySelector('.tab-content:not(.hidden)'); if (activeTab) switchTab(activeTab.id.replace('tab-','')); else loadWeather(); }
-
-        document.getElementById('citySearchInput').addEventListener('keydown', async function(e) { if (e.key === 'Enter') { const input = this.value.trim(); if (!input) return; try { const data = await fetchJSON(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(input)}&appid=${WEATHER_KEY}&units=metric&lang=ru`); if (data.cod && data.cod !== 200) { alert('Город не найден'); return; } selectCity(data.name || input, data.name || input); } catch (e) { alert('Ошибка при проверке города'); } } });
-
-        async function openDayHourly(dateStr) { document.getElementById('dayHourlyModal').classList.remove('hidden'); document.getElementById('dayHourlyTitle').textContent = `Почасовой прогноз на ${new Date(dateStr).toLocaleDateString('ru-RU')}`; const hourly = await getHourlyForDate(currentCity, dateStr); const content = hourly.map(h => `<div class="hourly-detail-item"><span>${h.time}</span><span>${h.icon} ${h.temp.toFixed(0)}°C</span><span style="color:var(--sub);font-size:14px;">${h.desc}</span></div>`).join(''); document.getElementById('dayHourlyContent').innerHTML = content; }
-        function closeDayHourlyModal() { document.getElementById('dayHourlyModal').classList.add('hidden'); }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(t => { t.classList.add('hidden'); t.classList.remove('active'); });
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            const tabEl = document.getElementById(`tab-${tab}`);
-            if (tabEl) { tabEl.classList.remove('hidden'); tabEl.classList.add('active'); }
-            const btn = document.querySelector(`.nav-btn[onclick*="switchTab('${tab}')"]`);
-            if (btn) btn.classList.add('active');
-            if (tab === 'weather') loadWeather();
-            else if (tab === 'forecast') loadForecast();
-            else if (tab === 'rates') loadRates();
-            else if (tab === 'convert') renderHistory();
-        }
-
-        loadWeather();
-    </script>
+
+
+}catch(e){
+
+document.getElementById("result").innerHTML=
+"Ошибка конвертации";
+
+}
+
+}
+
+
+
+
+
+
+
+function swap(){
+
+let a=document.getElementById("from");
+
+let b=document.getElementById("to");
+
+
+let t=a.value;
+
+a.value=b.value;
+
+b.value=t;
+
+}
+
+
+
+
+
+
+
+function openCity(){
+
+document
+.getElementById("cityModal")
+.classList.remove("hidden");
+
+}
+
+
+
+
+function closeCity(){
+
+document
+.getElementById("cityModal")
+.classList.add("hidden");
+
+}
+
+
+
+
+
+function selectCity(en,ru){
+
+city=en;
+
+cityRu=ru;
+
+
+localStorage.setItem("city",city);
+
+localStorage.setItem("cityRu",cityRu);
+
+
+closeCity();
+
+loadWeather();
+
+}
+
+
+
+
+
+
+
+function switchTab(tab){
+
+
+document.querySelectorAll("section")
+.forEach(x=>
+x.classList.add("hidden")
+);
+
+
+
+document
+.getElementById(tab+"Tab")
+.classList.remove("hidden");
+
+
+
+if(tab==="weather")
+loadWeather();
+
+
+if(tab==="forecast")
+loadForecast();
+
+
+if(tab==="rates")
+loadRates();
+
+
+}
+
+
+
+
+
+
+
+loadWeather();
+
+
+</script>
+
+
 </body>
+
 </html>
